@@ -1,6 +1,6 @@
 # 🏘️ Sadara Warga (v1.0.0 Stable)
 
-**"Dekat di Hati, Cepat Melayani."**
+**"Ruang Sapa & Kemudahan Bertetangga"**
 
 Sadara Warga (Sistem Administrasi dan Pelaporan Warga) adalah platform digital eksklusif yang dirancang khusus untuk memenuhi kebutuhan warga di **Kp. Sinagar RT 003 RW 006** Desa Cihideung Udik. Aplikasi ini diciptakan untuk mempererat tali silaturahmi serta menciptakan pelayanan wilayah yang lebih praktis, efisien, dan terbuka bagi seluruh elemen masyarakat.
 
@@ -48,11 +48,6 @@ Warga bisa melaporkan kendala lingkungan (lampu mati, sampah, dll) dengan otomat
     ```bash
     flutter run
     ```
-
----
-
-## 👥 Tim Pengembang
-Dikembangkan dengan penuh dedikasi oleh **Tim Sinagar Official**.
 
 ---
 © 2026 Sadara Warga - Kp. Sinagar RT 003/006.

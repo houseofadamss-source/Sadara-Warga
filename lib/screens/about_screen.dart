@@ -35,7 +35,7 @@ class AboutScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
                   const Text('Sadara Warga', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textDark)),
-                  const Text('"Dekat di Hati, Cepat Melayani."', style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic, color: primaryTeal)),
+                  const Text('"Ruang Sapa & Kemudahan Bertetangga"', style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic, color: primaryTeal)),
                   const SizedBox(height: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
