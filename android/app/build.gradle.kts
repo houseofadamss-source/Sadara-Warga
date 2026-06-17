@@ -24,6 +24,8 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        manifestPlaceholders += mapOf("flutterWebAuth2RedirectScheme" to "com.sadarawarga.app")
     }
 
     buildTypes {

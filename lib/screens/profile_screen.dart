@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'edit_profile_screen.dart';
 import 'settings_screen.dart';
 import 'faq_screen.dart';
 import 'welcome_screen.dart';
+import 'changelog_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
-  final VoidCallback? onBack; // Tambahin callback buat back
+  final VoidCallback? onBack; 
   const ProfileScreen({super.key, required this.userData, this.onBack});
 
   @override
@@ -18,11 +20,35 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _isNikVisible = false;
   late Map<String, dynamic> _user;
+  bool _hasUpdate = false;
+  String _currentVersion = "";
 
   @override
   void initState() {
     super.initState();
     _user = widget.userData;
+    _checkVersion();
+  }
+
+  Future<void> _checkVersion() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      _currentVersion = packageInfo.version;
+      
+      final data = await Supabase.instance.client
+          .from('app_updates')
+          .select('version_name')
+          .order('version_code', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      if (data != null && mounted) {
+        final latestVersion = data['version_name'];
+        if (latestVersion != _currentVersion) {
+          setState(() => _hasUpdate = true);
+        }
+      }
+    } catch (e) { /* ignore */ }
   }
 
   @override
@@ -67,16 +93,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return '************${nik.substring(12)}';
   }
 
-  String _formatWhatsApp(String hp) {
-    String clean = hp.replaceAll(RegExp(r'[^0-9]'), '');
-    if (clean.startsWith('0')) {
-      return '+62${clean.substring(1)}';
-    } else if (clean.startsWith('62')) {
-      return '+$clean';
-    }
-    return '+$clean';
-  }
-
   @override
   Widget build(BuildContext context) {
     const Color primaryTeal = Color(0xFF0F766E);
@@ -94,7 +110,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           icon: const Icon(Icons.arrow_back_ios_new, color: textDark, size: 20),
           onPressed: () {
             if (widget.onBack != null) {
-              widget.onBack!(); // Balik ke tab 0 lewat callback
+              widget.onBack!(); 
             } else {
               Navigator.pop(context);
             }
@@ -105,7 +121,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            // --- TOP CONTAINER (FOTO, NAMA, EMAIL, WA, EDIT BUTTON) ---
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
@@ -115,7 +130,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               child: Column(
                 children: [
-                  // Foto Profil
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
@@ -134,76 +148,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
-                  // Nama Warga
                   Text(
                     _user['nama_lengkap'] ?? 'Nama Warga',
                     textAlign: TextAlign.center,
                     style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textDark),
                   ),
                   const SizedBox(height: 8),
-                  
-                  // Email & WhatsApp Row
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            _user['email'] ?? '-',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
-                          ),
-                        ),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 6),
-                          child: Icon(Icons.circle, size: 4, color: Colors.grey),
-                        ),
-                        Text(
-                          _formatWhatsApp(_user['nomor_hp'] ?? ''),
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
-                        ),
-                      ],
-                    ),
+                  Text(
+                    _user['email'] ?? '-',
+                    style: const TextStyle(color: Colors.grey, fontSize: 14),
                   ),
                   const SizedBox(height: 24),
-                  
-                  // Edit Profile Button
                   SizedBox(
                     width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        final result = await Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => EditProfileScreen(userData: {
-                            'nama': _user['nama_lengkap'] ?? '',
-                            'hp': _user['nomor_hp'] ?? '',
-                            'alamat': _user['alamat'] ?? '',
-                            'nik': _user['nik'] ?? '',
-                            'foto': _user['foto_profil'] ?? '',
-                          })),
-                        );
-                        if (result == true) _refreshData();
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                         final Map<String, String> stringUser = _user.map((key, value) => MapEntry(key, value?.toString() ?? ''));
+                         Navigator.push(context, MaterialPageRoute(builder: (c) => EditProfileScreen(userData: stringUser))).then((_) => _refreshData());
                       },
+                      icon: const Icon(Icons.edit_note_rounded, size: 20),
+                      label: const Text('EDIT PROFIL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryTeal,
                         foregroundColor: Colors.white,
-                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        elevation: 0,
                       ),
-                      child: const Text('Edit Profil', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                     ),
                   ),
                 ],
               ),
             ),
-            
             const SizedBox(height: 20),
-
-            // --- BOTTOM CONTAINER (NIK & ALAMAT) ---
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -212,7 +189,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               child: Column(
                 children: [
-                  // NIK Section
                   Padding(
                     padding: const EdgeInsets.all(20),
                     child: Row(
@@ -247,10 +223,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ],
                     ),
                   ),
-                  
                   const Divider(height: 1, indent: 20, endIndent: 20, color: Color(0xFFF1F5F9)),
-                  
-                  // Alamat Section
                   Padding(
                     padding: const EdgeInsets.all(20),
                     child: Row(
@@ -281,20 +254,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-            
             const SizedBox(height: 20),
-            
-            // --- MENU TILES ---
             _buildSettingsTile(context, Icons.settings_outlined, 'Pengaturan', () {
                Navigator.push(context, MaterialPageRoute(builder: (c) => SettingsScreen(userName: _user['nama_lengkap'] ?? 'Warga', userNik: _user['nik'] ?? '-')));
             }),
+            const SizedBox(height: 12),
+            _buildSettingsTile(
+              context, 
+              Icons.system_update_rounded, 
+              'Versi Aplikasi', 
+              () {
+                setState(() => _hasUpdate = false);
+                Navigator.push(context, MaterialPageRoute(builder: (c) => const ChangelogScreen()));
+              },
+              showBadge: _hasUpdate,
+              trailingText: "v$_currentVersion",
+            ),
             const SizedBox(height: 12),
             _buildSettingsTile(context, Icons.help_outline_rounded, 'Pusat Bantuan', () {
                Navigator.push(context, MaterialPageRoute(builder: (c) => FaqScreen(userName: _user['nama_lengkap'] ?? 'Warga', userNik: _user['nik'] ?? '-')));
             }),
             const SizedBox(height: 12),
             _buildSettingsTile(context, Icons.logout_rounded, 'Keluar Akun', () => _showLogoutDialog(), isDestructive: true),
-            
             const SizedBox(height: 120),
           ],
         ),
@@ -324,7 +305,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildSettingsTile(BuildContext context, IconData icon, String title, VoidCallback onTap, {bool isDestructive = false}) {
+  Widget _buildSettingsTile(BuildContext context, IconData icon, String title, VoidCallback onTap, {bool isDestructive = false, bool showBadge = false, String? trailingText}) {
     const Color primaryTeal = Color(0xFF0F766E);
     const Color textDark = Color(0xFF1E293B);
     final Color iconColor = isDestructive ? Colors.red : primaryTeal;
@@ -345,8 +326,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
           decoration: BoxDecoration(color: isDestructive ? Colors.red.withValues(alpha: 0.05) : const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(12)),
           child: Icon(icon, color: iconColor, size: 22),
         ),
-        title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: textColor)),
-        trailing: isDestructive ? null : const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFFCBD5E1)),
+        title: Row(
+          children: [
+            Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: textColor)),
+            if (showBadge) ...[
+              const SizedBox(width: 8),
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+              ),
+            ]
+          ],
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (trailingText != null) Text(trailingText, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+            const SizedBox(width: 4),
+            if (!isDestructive) const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFFCBD5E1)),
+          ],
+        ),
       ),
     );
   }

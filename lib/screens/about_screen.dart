@@ -24,13 +24,21 @@ class AboutScreen extends StatelessWidget {
               child: Column(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(color: primaryTeal.withValues(alpha: 0.1), shape: BoxShape.circle),
-                    child: Image.asset(
-                      'assets/images/Logo.png',
-                      height: 80,
-                      width: 80,
-                      errorBuilder: (c, e, s) => const Icon(Icons.home_work_rounded, size: 64, color: primaryTeal),
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: primaryTeal.withValues(alpha: 0.1), width: 2),
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
+                    ),
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/images/Logo.png',
+                        height: 100,
+                        width: 100,
+                        fit: BoxFit.cover,
+                        errorBuilder: (c, e, s) => const Icon(Icons.home_work_rounded, size: 64, color: primaryTeal),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 24),

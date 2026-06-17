@@ -242,12 +242,26 @@ class _LoginScreenState extends State<LoginScreen> {
           children: [
             const SizedBox(height: 20),
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: primaryTeal.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(16),
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(color: primaryTeal.withValues(alpha: 0.1), width: 2),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
               ),
-              child: const Icon(Icons.location_city_rounded, size: 40, color: primaryTeal),
+              child: ClipOval(
+                child: Image.asset(
+                  'assets/images/Logo.png',
+                  height: 60,
+                  width: 60,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => const Icon(
+                    Icons.location_city_rounded,
+                    size: 40,
+                    color: primaryTeal,
+                  ),
+                ),
+              ),
             ),
             const SizedBox(height: 24),
             const Text(

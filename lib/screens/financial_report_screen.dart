@@ -48,7 +48,9 @@ class FinancialReportScreen extends StatelessWidget {
                   GestureDetector(
                     onTap: () async {
                       final url = Uri.parse(kas['google_doc_url']);
-                      if (await canLaunchUrl(url)) await launchUrl(url, mode: LaunchMode.externalApplication);
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(url, mode: LaunchMode.inAppBrowserView);
+                      }
                     },
                     child: Container(
                       padding: const EdgeInsets.all(20),

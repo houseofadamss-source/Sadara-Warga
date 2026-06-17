@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../services/osm_api_service.dart'; // Import Baru
 
 class AdminUmkmManagementScreen extends StatefulWidget {
   const AdminUmkmManagementScreen({super.key});
@@ -11,6 +12,7 @@ class AdminUmkmManagementScreen extends StatefulWidget {
 
 class _AdminUmkmManagementScreenState extends State<AdminUmkmManagementScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final OsmApiService _osmApi = OsmApiService(); // Instance baru
   final Color primaryTeal = const Color(0xFF0F766E);
   final Color textDark = const Color(0xFF1E293B);
 
@@ -172,8 +174,11 @@ class _AdminUmkmManagementScreenState extends State<AdminUmkmManagementScreen> w
                                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                                 child: InkWell(
                                   onTap: () async {
-                                    final url = Uri.parse("https://www.google.com/maps/search/?api=1&query=${item['latitude']},${item['longitude']}");
-                                    if (await canLaunchUrl(url)) await launchUrl(url, mode: LaunchMode.externalApplication);
+                                    // BUKA DI OPENSTREETMAP (In-App WebView)
+                                    final url = Uri.parse("https://www.openstreetmap.org/?mlat=${item['latitude']}&mlon=${item['longitude']}#map=18/${item['latitude']}/${item['longitude']}");
+                                    if (await canLaunchUrl(url)) {
+                                      await launchUrl(url, mode: LaunchMode.inAppBrowserView);
+                                    }
                                   },
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -212,13 +217,31 @@ class _AdminUmkmManagementScreenState extends State<AdminUmkmManagementScreen> w
                                       ),
                                     ],
                                   )
-                                : Row(
-                                    children: [
-                                      if (isFeatured)
-                                        const Row(children: [Icon(Icons.auto_awesome, color: Colors.amber, size: 14), SizedBox(width: 4), Text('Mejeng di Beranda', style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 11))]),
-                                      const Spacer(),
-                                      TextButton(onPressed: () => _updateStatus(item['id'], 'pending'), child: const Text('BATALKAN VERIFIKASI', style: TextStyle(color: Colors.orange, fontSize: 11, fontWeight: FontWeight.bold))),
-                                    ],
+                                : SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    child: Row(
+                                      children: [
+                                        if (isFeatured)
+                                          const Row(children: [Icon(Icons.auto_awesome, color: Colors.amber, size: 14), SizedBox(width: 4), Text('Mejeng di Beranda', style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 11))]),
+                                        const SizedBox(width: 8),
+                                        // TOMBOL PUSH KE OSM
+                                        IconButton(
+                                          onPressed: () async {
+                                            bool ok = await _osmApi.pushToOsm(item);
+                                            if (mounted) {
+                                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                                content: Text(ok ? 'Berhasil diterbitkan ke Peta Dunia!' : 'Gagal terbit. Pastikan sudah login OSM.'),
+                                                backgroundColor: ok ? Colors.blue : Colors.red,
+                                              ));
+                                            }
+                                          }, 
+                                          icon: const Icon(Icons.cloud_upload_outlined, color: Colors.blue),
+                                          tooltip: 'Terbitkan ke Peta Dunia (OSM)',
+                                        ),
+                                        const SizedBox(width: 8),
+                                        TextButton(onPressed: () => _updateStatus(item['id'], 'pending'), child: const Text('BATALKAN VERIFIKASI', style: TextStyle(color: Colors.orange, fontSize: 11, fontWeight: FontWeight.bold))),
+                                      ],
+                                    ),
                                   ),
                             ),
                           ],

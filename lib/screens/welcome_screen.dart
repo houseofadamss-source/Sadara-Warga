@@ -46,14 +46,17 @@ class WelcomeScreen extends StatelessWidget {
                   color: primaryTeal.withValues(alpha: 0.05),
                   shape: BoxShape.circle,
                 ),
-                child: Image.asset(
-                  'assets/images/Logo.png',
-                  height: 100,
-                  width: 100,
-                  errorBuilder: (context, error, stackTrace) => const Icon(
-                    Icons.location_city_rounded,
-                    size: 80,
-                    color: primaryTeal,
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/images/Logo.png',
+                    height: 120,
+                    width: 120,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => const Icon(
+                      Icons.location_city_rounded,
+                      size: 80,
+                      color: primaryTeal,
+                    ),
                   ),
                 ),
               ),

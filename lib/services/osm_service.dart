@@ -6,14 +6,14 @@ class OsmService {
   static const double sinagarLng = 106.7162769;
 
   Future<List<Map<String, dynamic>>> fetchNearbyUmkm() async {
-    // JURUS AGRESIF: Cari radius 3km, ambil node, way, dan relasi agar lebih akurat
+    // JURUS LOKAL: Radius 1500 meter (1.5 KM) agar lebih akurat dan relevan bagi warga
     const query = """
     [out:json][timeout:30];
     (
-      node["shop"](around:3000, $sinagarLat, $sinagarLng);
-      way["shop"](around:3000, $sinagarLat, $sinagarLng);
-      node["amenity"~"restaurant|cafe|fast_food|laundry|pharmacy|atm|bank"](around:3000, $sinagarLat, $sinagarLng);
-      way["amenity"~"restaurant|cafe|fast_food|laundry|pharmacy|atm|bank"](around:3000, $sinagarLat, $sinagarLng);
+      node["shop"](around:1500, $sinagarLat, $sinagarLng);
+      way["shop"](around:1500, $sinagarLat, $sinagarLng);
+      node["amenity"~"restaurant|cafe|fast_food|laundry|pharmacy|atm|bank"](around:1500, $sinagarLat, $sinagarLng);
+      way["amenity"~"restaurant|cafe|fast_food|laundry|pharmacy|atm|bank"](around:1500, $sinagarLat, $sinagarLng);
     );
     out center;
     """;
@@ -21,6 +21,7 @@ class OsmService {
     try {
       final response = await http.post(
         Uri.parse('https://overpass-api.de/api/interpreter'),
+        headers: {'User-Agent': 'SadaraWargaApp/1.0.0'},
         body: query,
       );
 
@@ -30,7 +31,6 @@ class OsmService {
 
         return elements.map((e) {
           final tags = e['tags'] as Map<String, dynamic>;
-          // out center mengembalikan lat/lon di root elemen atau di dalam 'center' untuk way
           double lat = e['lat'] ?? e['center']?['lat'] ?? 0.0;
           double lon = e['lon'] ?? e['center']?['lon'] ?? 0.0;
           
@@ -48,7 +48,6 @@ class OsmService {
       }
       return [];
     } catch (e) {
-      print('OSM Error: $e');
       return [];
     }
   }
