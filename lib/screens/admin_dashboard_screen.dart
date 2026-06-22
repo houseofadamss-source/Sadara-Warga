@@ -11,6 +11,7 @@ import 'admin_events_screen.dart';
 import 'admin_manage_iuran_screen.dart';
 import 'admin_financial_report_screen.dart';
 import 'admin_manage_surat_screen.dart'; // Import Baru
+import 'admin_emergency_management_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -168,6 +169,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               icon: Icons.pie_chart_rounded, color: Colors.pinkAccent, 
               title: 'Laporan Keuangan Kas', sub: 'Input pengeluaran & saldo kas RT',
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AdminFinancialReportScreen())),
+            ),
+
+            const SizedBox(height: 24),
+
+            _buildSectionHeader('SISTEM & KEAMANAN'),
+            _buildMenuTile(
+              icon: Icons.emergency_share_rounded, color: Colors.red, 
+              title: 'Kelola Kontak Darurat', sub: 'Atur nomor polisi, medis, & RT/RW',
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AdminEmergencyManagementScreen())),
             ),
             
             const SizedBox(height: 40),

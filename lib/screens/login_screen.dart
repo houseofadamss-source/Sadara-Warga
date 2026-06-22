@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'home_screen.dart';
 import 'register_screen.dart';
+import '../services/device_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -57,110 +58,109 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _masukAplikasi() async {
     if (_isBlocked) {
-      _showProfessionalDialog(
-        'Akses Dibekukan',
-        'Demi keamanan data warga, akun Anda telah dibekukan sementara karena terlalu banyak percobaan masuk yang gagal.\n\nMohon hubungi Ketua RT atau RW setempat untuk memulihkan akses Anda.',
-        Icons.lock_person,
-        Colors.red,
-      );
+      _showProfessionalDialog('Akses Dibekukan', 'Akun Anda dibekukan sementara karena terlalu banyak percobaan gagal.', Icons.lock_person, Colors.red);
       return;
     }
 
-    final inputID = _identifierController.text.trim();
+    final emailInput = _identifierController.text.trim();
     final password = _passwordController.text;
 
-    if (inputID.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Email/No. HP dan Kata Sandi wajib diisi!'))
-      );
+    if (emailInput.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Email dan Kata Sandi wajib diisi!')));
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      final user = await Supabase.instance.client
+      final client = Supabase.instance.client;
+
+      // 1. Login via Supabase Auth
+      final AuthResponse res = await client.auth.signInWithPassword(
+        email: emailInput,
+        password: password,
+      );
+
+      final String? userId = res.user?.id;
+      if (userId == null) throw 'Gagal mendapatkan data sesi.';
+
+      // 2. Ambil data tambahan dari tabel public.users
+      final userMetadata = await client
           .from('users')
           .select()
-          .or('nomor_hp.eq.$inputID,email.eq.$inputID')
+          .eq('id', userId)
           .maybeSingle();
 
       if (!mounted) return;
 
-      if (user == null) {
-        _showProfessionalDialog(
-          'Akun Tidak Terdaftar',
-          'Kami tidak menemukan Email atau Nomor Handphone tersebut di sistem kami.\n\nSilakan periksa kembali, atau daftar jika Anda adalah warga baru.',
-          Icons.search_off,
-          Colors.orange,
-        );
-      } else {
-        if (user['password_hash'] != password) {
-          _failedAttempts++;
-          if (_failedAttempts >= 3) {
-            setState(() => _isBlocked = true);
-            _showProfessionalDialog(
-              'Akses Dibekukan',
-              'Demi keamanan, akun Anda dibekukan sementara karena salah memasukkan kata sandi sebanyak 3 kali.\n\nMohon hubungi Ketua RT/RW setempat untuk memulihkan akses Anda.',
-              Icons.gpp_bad,
-              Colors.red,
-            );
-          } else {
-            int sisa = 3 - _failedAttempts;
-            _showProfessionalDialog(
-              'Kata Sandi Keliru',
-              'Kata sandi yang Anda masukkan salah. Sisa percobaan: $sisa kali lagi.',
-              Icons.warning_amber_rounded,
-              Colors.orange,
-            );
-          }
-        } else {
-          _failedAttempts = 0;
-          final statusAkun = user['status_akun'];
-
-          if (statusAkun == 'pending') {
-            _showProfessionalDialog(
-              'Proses Verifikasi',
-              'Status pendaftaran sedang menunggu verifikasi dari Ketua RT/RW setempat',
-              Icons.hourglass_bottom,
-              Colors.blue,
-            );
-          } else if (statusAkun == 'rejected') {
-            _showProfessionalDialog(
-              'Pendaftaran Ditolak',
-              'Status pendaftaran anda di tolak, hubungi ketua RT atau RW setempat, untuk melakukan konfirmasi',
-              Icons.cancel,
-              Colors.red,
-            );
-          } else if (statusAkun == 'approved') {
-            // Simpan sesi login
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setBool('isLoggedIn', true);
-            await prefs.setString('userName', user['nama_lengkap'] ?? 'Warga');
-            await prefs.setString('userNik', user['nik'] ?? '');
-            await prefs.setString('userRole', user['role'] ?? 'warga');
-
-            if (!mounted) return;
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (context) => const HomeScreen()),
-              (route) => false,
-            );
-          } else {
-            _showProfessionalDialog(
-              'Status Tidak Dikenal',
-              'Akun Anda memiliki status yang tidak valid. Mohon hubungi administrator.',
-              Icons.error_outline,
-              Colors.grey,
-            );
-          }
-        }
+      if (userMetadata == null) {
+        await client.auth.signOut();
+        _showProfessionalDialog('Profil Tidak Ditemukan', 'Email Anda terdaftar di sistem Auth, tapi data warga Anda di tabel Users kosong. Hubungi Pengurus.', Icons.error_outline, Colors.orange);
+        return;
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Terjadi kesalahan: ${e.toString()}'))
+
+      final statusAkun = userMetadata['status_akun'].toString().toLowerCase();
+
+      if (statusAkun == 'pending') {
+        await client.auth.signOut();
+        _showProfessionalDialog('Proses Verifikasi', 'Akun Anda sedang menunggu persetujuan dari Pengurus RT.', Icons.hourglass_bottom, Colors.blue);
+      } else if (statusAkun == 'rejected') {
+        await client.auth.signOut();
+        _showProfessionalDialog('Pendaftaran Ditolak', 'Status pendaftaran Anda ditolak. Silakan hubungi RT/RW.', Icons.cancel, Colors.red);
+      } else if (statusAkun == 'approved') {
+        // --- LOGIC GEMBOK HP (ONE DEVICE POLICY) ---
+        final currentDeviceId = await DeviceService().getUniqueId();
+        final registeredDeviceId = userMetadata['device_id'];
+
+        if (registeredDeviceId == null) {
+          // Kasus Warga Lama (Belum ada ID HP), kita daftarkan HP ini sekarang
+          await client.from('users').update({'device_id': currentDeviceId}).eq('id', userId);
+        } else if (registeredDeviceId != currentDeviceId) {
+          // HP Berbeda! Tendang keluar
+          await client.auth.signOut();
+          _showProfessionalDialog(
+            'Perangkat Tidak Dikenali', 
+            'Akun Anda terikat pada perangkat lain. Jika Anda mengganti HP, silakan hubungi Pak RT untuk reset perangkat.', 
+            Icons.phonelink_lock_rounded, 
+            Colors.orange
+          );
+          setState(() => _isLoading = false);
+          return;
+        }
+        // --------------------------------------------
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('isLoggedIn', true);
+        await prefs.setString('userName', userMetadata['nama_lengkap'] ?? 'Warga');
+        await prefs.setString('userNik', userMetadata['nik'] ?? '');
+        await prefs.setString('userRole', userMetadata['role'] ?? 'warga');
+
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          (route) => false,
         );
+      }
+
+    } catch (e) {
+      String errorMessage = 'Email atau Kata Sandi Anda salah.';
+      
+      // Deteksi error spesifik dari Supabase
+      final errorStr = e.toString().toLowerCase();
+      if (errorStr.contains('email not confirmed')) {
+        errorMessage = 'Email Anda belum dikonfirmasi. Mohon cek inbox/spam email Anda dan klik link konfirmasi.';
+      } else if (errorStr.contains('invalid login credentials')) {
+        errorMessage = 'Email atau Kata Sandi salah. Pastikan penulisan sudah benar.';
+      } else {
+        errorMessage = 'Gagal masuk: ${e.toString()}';
+      }
+
+      _failedAttempts++;
+      if (_failedAttempts >= 5) { // Gue longgarin dikit biar gak gampang keblokir pas testing
+        setState(() => _isBlocked = true);
+        _showProfessionalDialog('Akses Dibekukan', 'Terlalu banyak percobaan gagal. Silakan hubungi Admin Wilayah.', Icons.gpp_bad, Colors.red);
+      } else {
+        _showProfessionalDialog('Masuk Gagal', errorMessage, Icons.warning_amber_rounded, Colors.orange);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -264,22 +264,16 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
-              'Selamat Datang!',
-              style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: textDark),
-            ),
+            const Text('Selamat Datang!', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: textDark)),
             const SizedBox(height: 8),
-            const Text(
-              'Silakan masuk dengan akun warga Anda yang telah divalidasi RT.',
-              style: TextStyle(fontSize: 15, color: Color(0xFF64748B), height: 1.5),
-            ),
+            const Text('Silakan masuk dengan akun warga Anda yang telah didaftarkan.', style: TextStyle(fontSize: 15, color: Color(0xFF64748B), height: 1.5)),
             const SizedBox(height: 40),
 
             _buildModernField(
               controller: _identifierController,
               focusNode: _idFocus,
-              label: 'Email atau Nomor Handphone',
-              icon: Icons.person_outline_rounded,
+              label: 'Email Terdaftar',
+              icon: Icons.alternate_email_rounded,
               keyboardType: TextInputType.emailAddress,
             ),
             const SizedBox(height: 20),
@@ -295,25 +289,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 onPressed: () => setState(() => _obscureText = !_obscureText),
               ),
             ),
-            const SizedBox(height: 12),
-
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () {
-                  _showProfessionalDialog(
-                    'Fitur Dalam Pengembangan',
-                    'Sistem pemulihan kata sandi otomatis sedang dalam tahap penyempurnaan.\n\nMohon hubungi Ketua RT atau RW untuk bantuan reset kata sandi.',
-                    Icons.support_agent_rounded,
-                    Colors.blue,
-                  );
-                },
-                child: const Text(
-                  'Lupa Sandi?',
-                  style: TextStyle(color: primaryTeal, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
             const SizedBox(height: 32),
 
             SizedBox(
@@ -323,17 +298,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _isBlocked ? Colors.grey : primaryTeal,
                   foregroundColor: Colors.white,
+                  shadowColor: primaryTeal.withValues(alpha: 0.3),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                   elevation: _isBlocked ? 0 : 8,
-                  shadowColor: primaryTeal.withValues(alpha: 0.3),
                 ),
                 onPressed: (_isLoading || _isBlocked) ? null : _masukAplikasi,
                 child: _isLoading
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                        'MASUK SEKARANG',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.1),
-                      ),
+                    : const Text('MASUK SEKARANG', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
               ),
             ),
             const SizedBox(height: 24),
@@ -341,16 +313,10 @@ class _LoginScreenState extends State<LoginScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text('Belum punya akun?', style: TextStyle(color: Color(0xFF64748B))),
+                const Text('Warga baru?', style: TextStyle(color: Color(0xFF64748B))),
                 TextButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const RegisterScreen()),
-                  ),
-                  child: const Text(
-                    'Daftar Warga',
-                    style: TextStyle(color: primaryTeal, fontWeight: FontWeight.bold),
-                  ),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const RegisterScreen())),
+                  child: const Text('Mulai Daftar', style: TextStyle(color: primaryTeal, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),

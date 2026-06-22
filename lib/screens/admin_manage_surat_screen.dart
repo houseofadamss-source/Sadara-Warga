@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:intl/intl.dart';
 
 class AdminManageSuratScreen extends StatefulWidget {
   const AdminManageSuratScreen({super.key});
@@ -26,18 +25,17 @@ class _AdminManageSuratScreenState extends State<AdminManageSuratScreen> with Si
     super.dispose();
   }
 
-  Future<void> _updateStatus(String id, String status, {String? noSurat}) async {
+  Future<void> _updateStatus(dynamic id, String status, {String? noSurat}) async {
     try {
       final data = {'status': status};
       if (noSurat != null) data['nomor_surat'] = noSurat;
 
       await Supabase.instance.client.from('surat_pengantar').update(data).eq('id', id);
       if (mounted) {
-        setState(() {});
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Status surat diperbarui!'), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Selesai! Surat telah diproses.'), backgroundColor: Color(0xFF0F766E)));
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal memperbarui status: $e'), backgroundColor: Colors.red));
     }
   }
 
@@ -45,24 +43,33 @@ class _AdminManageSuratScreenState extends State<AdminManageSuratScreen> with Si
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
-      builder: (c) => Padding(
-        padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(c).viewInsets.bottom + 24),
+      backgroundColor: Colors.transparent,
+      builder: (c) => Container(
+        decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
+        padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(c).viewInsets.bottom + 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)))),
+            const SizedBox(height: 24),
             const Text('Proses Surat Pengantar', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            Text('Pemohon: ${surat['nama_lengkap']}', style: const TextStyle(color: Colors.grey)),
+            Text('Pemohon: ${surat['nama_lengkap']}', style: const TextStyle(color: Colors.grey, fontSize: 13)),
             const SizedBox(height: 24),
-            const Text('Input Nomor Surat', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            const Text('INPUT NOMOR SURAT RESMI', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.grey, letterSpacing: 0.5)),
             const SizedBox(height: 8),
             TextField(
               controller: _noSuratCtrl,
-              decoration: InputDecoration(hintText: 'Contoh: 001/SP/RT03/VI/2026', filled: true, fillColor: const Color(0xFFF8FAFC), border: OutlineInputBorder(borderRadius: BorderRadius.circular(16))),
+              decoration: InputDecoration(
+                hintText: 'Misal: 001/SP/RT03/VI/2026', 
+                filled: true, fillColor: const Color(0xFFF8FAFC), 
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.shade200)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.shade200)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF0F766E))),
+              ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
             SizedBox(
               width: double.infinity, height: 56,
               child: ElevatedButton(
@@ -71,8 +78,8 @@ class _AdminManageSuratScreenState extends State<AdminManageSuratScreen> with Si
                   _noSuratCtrl.clear();
                   Navigator.pop(context);
                 },
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F766E), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                child: const Text('SETUJUI & TERBITKAN', style: TextStyle(fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F766E), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)), elevation: 0),
+                child: const Text('SETUJUI & TERBITKAN', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
               ),
             ),
           ],
@@ -94,8 +101,9 @@ class _AdminManageSuratScreenState extends State<AdminManageSuratScreen> with Si
         leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new, color: textDark, size: 20), onPressed: () => Navigator.pop(context)),
         bottom: TabBar(
           controller: _tabController,
-          labelColor: primaryTeal, unselectedLabelColor: Colors.grey, indicatorColor: primaryTeal,
-          tabs: const [Tab(text: 'PENDING'), Tab(text: 'SELESAI')],
+          labelColor: primaryTeal, unselectedLabelColor: const Color(0xFF94A3B8), indicatorColor: primaryTeal, indicatorWeight: 3,
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+          tabs: const [Tab(text: 'ANTRIAN MASUK'), Tab(text: 'SURAT SELESAI')],
         ),
       ),
       body: TabBarView(
@@ -109,8 +117,8 @@ class _AdminManageSuratScreenState extends State<AdminManageSuratScreen> with Si
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: Supabase.instance.client.from('surat_pengantar').stream(primaryKey: ['id']).eq('status', status).order('created_at', ascending: false),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final items = snapshot.data!;
+        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator(color: Color(0xFF0F766E)));
+        final items = snapshot.data ?? [];
         
         return CustomScrollView(
           physics: const BouncingScrollPhysics(),
@@ -121,12 +129,12 @@ class _AdminManageSuratScreenState extends State<AdminManageSuratScreen> with Si
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(status == 'pending' ? 'ANTRIAN SURAT' : 'ARSIP SURAT KELUAR', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                    Text(status == 'pending' ? 'ANTRIAN PENGAJUAN' : 'ARSIP SURAT KELUAR', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
                     const SizedBox(height: 8),
                     Text(
                       status == 'pending' 
-                        ? 'Periksa data warga di bawah ini. Pastikan data sudah sesuai sebelum memberikan nomor surat resmi.' 
-                        : 'Berikut adalah daftar surat yang sudah Anda setujui dan siap diberikan tanda tangan basah.', 
+                        ? 'Klik tombol proses untuk memberikan nomor surat resmi pada pengajuan warga.' 
+                        : 'Daftar surat pengantar yang telah disetujui dan diberikan nomor resmi.', 
                       style: TextStyle(fontSize: 13, color: const Color(0xFF64748B).withValues(alpha: 0.8), height: 1.5)
                     ),
                   ],
@@ -140,7 +148,7 @@ class _AdminManageSuratScreenState extends State<AdminManageSuratScreen> with Si
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(status == 'pending' ? Icons.mail_outline_rounded : Icons.mark_as_unread_rounded, size: 64, color: Colors.grey.shade300),
+                      Icon(status == 'pending' ? Icons.mail_outline_rounded : Icons.mark_as_unread_rounded, size: 64, color: Colors.grey.shade200),
                       const SizedBox(height: 16),
                       Text('Tidak ada data ${status == 'pending' ? 'antrian' : 'arsip'}.', style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w500)),
                     ],
@@ -155,12 +163,12 @@ class _AdminManageSuratScreenState extends State<AdminManageSuratScreen> with Si
                     (c, i) {
                       final s = items[i];
                       return Container(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        padding: const EdgeInsets.all(20),
+                        margin: const EdgeInsets.only(bottom: 20),
+                        padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
                           color: Colors.white, 
-                          borderRadius: BorderRadius.circular(24), 
-                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))]
+                          borderRadius: BorderRadius.circular(28), 
+                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 15, offset: const Offset(0, 8))]
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -168,17 +176,17 @@ class _AdminManageSuratScreenState extends State<AdminManageSuratScreen> with Si
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(s['nama_lengkap'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E293B))),
-                                if (status == 'approved') Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)), child: Text(s['nomor_surat'] ?? '-', style: const TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold))),
+                                Expanded(child: Text(s['nama_lengkap'], style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Color(0xFF1E293B)))),
+                                if (status == 'approved') Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)), child: Text(s['nomor_surat'] ?? '-', style: const TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5))),
                               ],
                             ),
-                            const SizedBox(height: 4),
-                            Text('Keperluan: ${s['keperluan']}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                            const Divider(height: 32),
+                            const SizedBox(height: 8),
+                            Text('KEPERLUAN: ${s['keperluan']}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+                            const Divider(height: 40),
                             if (status == 'pending')
-                              SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () => _showProcessModal(s), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F766E), foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), child: const Text('PROSES & BERI NOMOR')))
+                              SizedBox(width: double.infinity, height: 50, child: ElevatedButton(onPressed: () => _showProcessModal(s), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F766E), foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))), child: const Text('PROSES & BERI NOMOR', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5))))
                             else
-                              Row(children: [Icon(Icons.check_circle, color: Colors.green, size: 16), const SizedBox(width: 8), const Text('Siap Tanda Tangan Basah', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12))]),
+                              Row(children: [const Icon(Icons.check_circle_rounded, color: Colors.green, size: 20), const SizedBox(width: 8), const Text('Sudah Terbit & Terarsipkan', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 13))]),
                           ],
                         ),
                       );

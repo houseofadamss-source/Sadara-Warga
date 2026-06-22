@@ -96,11 +96,13 @@ class _AddAnnouncementScreenState extends State<AddAnnouncementScreen> with Sing
   Future<void> _publish(String tipe) async {
     setState(() => _isLoading = true);
     try {
-      Map<String, dynamic> data = {
+      final client = Supabase.instance.client;
+      final user = client.auth.currentUser;
+      if (user == null) throw 'Sesi berakhir, silakan login ulang.';
+
+      Map<String, dynamic> payload = {
         'tipe': tipe,
-        'author_id': 'super_admin',
-        'kategori': 'INFO',
-        'created_at': DateTime.now().toIso8601String(), // JURUS SAKTI: Kirim jam HP detik ini!
+        'author_id': user.id,
       };
 
       if (tipe == 'kabar') {
@@ -111,32 +113,31 @@ class _AddAnnouncementScreenState extends State<AddAnnouncementScreen> with Sing
           uploadedUrl = await _uploadImage(_selectedImage!);
         }
 
-        data.addAll({
+        payload.addAll({
           'judul': _kabarJudulCtrl.text.trim(),
           'konten': _kabarIsiCtrl.text.trim(),
           'file_url': uploadedUrl,
         });
       } else {
-        if (_autoTitle == null) throw 'Link tidak valid';
-        data.addAll({
+        if (_autoTitle == null) throw 'Link tidak valid atau ringkasan tidak ditemukan.';
+        payload.addAll({
           'judul': _autoTitle,
           'sub_judul': _autoDesc,
-          'blog_url': _beritaLinkCtrl.text.trim(),
+          'konten': _beritaLinkCtrl.text.trim(), // Link URL simpan di kolom konten
           'file_url': _autoImage,
-          'konten': 'Baca selengkapnya di link tersebut.',
         });
       }
 
-      await Supabase.instance.client.from('announcements').insert(data);
+      await client.from('announcements').insert(payload);
 
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${tipe == 'kabar' ? 'Kabar' : 'Berita'} berhasil dikirim!'), backgroundColor: const Color(0xFF0F766E))
+          SnackBar(content: Text('${tipe == 'kabar' ? 'Kabar' : 'Berita'} berhasil diterbitkan!'), backgroundColor: const Color(0xFF0F766E))
         );
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal menerbitkan: $e'), backgroundColor: Colors.red));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -149,24 +150,17 @@ class _AddAnnouncementScreenState extends State<AddAnnouncementScreen> with Sing
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white, elevation: 0,
-        title: const Text('TERBITKAN INFO', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14)),
+        centerTitle: true,
+        title: const Text('BUAT PENGUMUMAN', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 1.5)),
         leading: IconButton(icon: const Icon(Icons.close, color: Colors.black), onPressed: () => Navigator.pop(context)),
         bottom: TabBar(
           controller: _tabController,
           labelColor: primaryTeal, unselectedLabelColor: Colors.grey,
           indicatorColor: primaryTeal, indicatorWeight: 3,
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
           tabs: const [
-            Tab(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.bolt_rounded, size: 18),
-                  SizedBox(width: 8),
-                  Text('Kabar Instant'),
-                ],
-              ),
-            ), 
-            Tab(text: 'Berita Link')
+            Tab(text: 'KABAR INSTANT'), 
+            Tab(text: 'BERITA ONLINE')
           ],
         ),
       ),
@@ -186,47 +180,46 @@ class _AddAnnouncementScreenState extends State<AddAnnouncementScreen> with Sing
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('BAGIKAN INFO TERBARU', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
-                    SizedBox(height: 8),
-                    Text(
-                      'Tulis pesan singkat atau kabar mendadak untuk segera diketahui oleh seluruh warga di aplikasi.',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.5),
-                    ),
-                  ],
+                const Text('INFO CEPAT WARGA', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                const SizedBox(height: 8),
+                const Text(
+                  'Tulis pesan singkat untuk segera diketahui oleh seluruh warga di aplikasi.',
+                  style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.5),
                 ),
                 const SizedBox(height: 32),
-                const Text('JUDUL KABAR', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.grey)),
-                TextField(controller: _kabarJudulCtrl, decoration: const InputDecoration(hintText: 'Info Singkat...', border: InputBorder.none), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                const Text('JUDUL INFO', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.grey, letterSpacing: 0.5)),
+                TextField(
+                  controller: _kabarJudulCtrl, 
+                  decoration: const InputDecoration(hintText: 'Misal: Kerja Bakti Besok', border: InputBorder.none, hintStyle: TextStyle(color: Colors.black12)), 
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)
+                ),
                 const Divider(),
-                const Text('ISI PESAN', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.grey)),
+                const SizedBox(height: 12),
+                const Text('PESAN (Maks 1000 Karakter)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.grey, letterSpacing: 0.5)),
                 TextField(
                   controller: _kabarIsiCtrl, 
-                  maxLines: 8, 
+                  maxLines: 10, 
                   maxLength: 1000, 
                   buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                  decoration: const InputDecoration(hintText: 'Tulis pesan...', border: InputBorder.none)
+                  decoration: const InputDecoration(hintText: 'Tulis pesan lengkap di sini...', border: InputBorder.none, hintStyle: TextStyle(color: Colors.black12))
                 ),
                 
-                // PREVIEW FOTO (Hanya muncul kalau sudah pilih foto)
                 if (_selectedImage != null) 
                   Stack(
                     children: [
                       Container(
-                        margin: const EdgeInsets.only(top: 10),
-                        width: 150, height: 150,
+                        margin: const EdgeInsets.only(top: 20),
+                        width: double.infinity, height: 200,
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(15),
+                          borderRadius: BorderRadius.circular(20),
                           image: DecorationImage(image: FileImage(_selectedImage!), fit: BoxFit.cover),
                         ),
                       ),
                       Positioned(
-                        right: 0, top: 0,
+                        right: 10, top: 30,
                         child: GestureDetector(
                           onTap: () => setState(() => _selectedImage = null),
-                          child: const CircleAvatar(radius: 12, backgroundColor: Colors.red, child: Icon(Icons.close, size: 14, color: Colors.white)),
+                          child: CircleAvatar(radius: 15, backgroundColor: Colors.black.withValues(alpha: 0.5), child: const Icon(Icons.close, size: 18, color: Colors.white)),
                         ),
                       ),
                     ],
@@ -236,41 +229,43 @@ class _AddAnnouncementScreenState extends State<AddAnnouncementScreen> with Sing
           ),
         ),
         
-        // TOOLBAR BAWAH (Icon Foto nempel di kiri bawah)
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             color: Colors.white,
-            border: Border(top: BorderSide(color: Colors.grey.withValues(alpha: 0.2))),
+            border: Border(top: BorderSide(color: Colors.grey.withValues(alpha: 0.1))),
           ),
           child: Column(
             children: [
               Row(
                 children: [
-                  IconButton(
+                  ActionChip(
                     onPressed: _pickImage,
-                    icon: Icon(Icons.add_a_photo_rounded, color: primary),
-                    tooltip: 'Tambah Foto',
+                    avatar: Icon(Icons.add_a_photo_rounded, color: primary, size: 16),
+                    label: Text(_selectedImage == null ? 'Lampirkan Foto' : 'Ganti Foto', style: TextStyle(color: primary, fontWeight: FontWeight.bold, fontSize: 11)),
+                    backgroundColor: primary.withValues(alpha: 0.05),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  const Text('Lampirkan Foto', style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500)),
                   const Spacer(),
                   Text(
-                    '$_charCount/1000',
+                    '$_charCount / 1000',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: _charCount >= 1000 ? Colors.red : Colors.grey,
+                      color: _charCount >= 950 ? Colors.red : Colors.grey,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               SizedBox(
-                width: double.infinity, height: 55,
+                width: double.infinity, height: 56,
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : () => _publish('kabar'),
-                  style: ElevatedButton.styleFrom(backgroundColor: primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                  child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('KIRIM SEKARANG', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(backgroundColor: primary, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)), elevation: 0),
+                  child: _isLoading 
+                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Text('TERBITKAN SEKARANG', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
                 ),
               ),
             ],
@@ -286,38 +281,54 @@ class _AddAnnouncementScreenState extends State<AddAnnouncementScreen> with Sing
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('TERBITKAN BERITA LENGKAP', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
-              SizedBox(height: 8),
-              Text(
-                'Tempelkan link berita dari blog luar (Notion/Substack), sistem akan otomatis mengambil ringkasan beritanya untuk warga.',
-                style: TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.5),
-              ),
-            ],
+          const Text('BAGIKAN BERITA ONLINE', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+          const SizedBox(height: 8),
+          const Text(
+            'Tempelkan link berita dari portal berita terpercaya, sistem akan otomatis mengambil ringkasan beritanya untuk warga.',
+            style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.5),
           ),
           const SizedBox(height: 32),
-          const Text('LINK BLOG (SUBSTACK/NOTION)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.grey)),
+          const Text('LINK BERITA / ARTIKEL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.grey, letterSpacing: 0.5)),
           const SizedBox(height: 12),
           TextField(
-            controller: _beritaLinkCtrl, onChanged: _fetchMetadata,
+            controller: _beritaLinkCtrl, 
+            onChanged: _fetchMetadata,
             decoration: InputDecoration(
-              hintText: 'https://...', filled: true, fillColor: const Color(0xFFF1F5F9),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-              prefixIcon: const Icon(Icons.link, color: Colors.teal),
+              hintText: 'https://...', filled: true, fillColor: const Color(0xFFF8FAFC),
+              hintStyle: const TextStyle(color: Colors.black12),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.shade200)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.shade200)),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: primary)),
+              prefixIcon: Icon(Icons.link_rounded, color: primary),
             ),
           ),
-          const SizedBox(height: 24),
-          if (_isLoading) const Center(child: CircularProgressIndicator())
-          else if (_autoTitle != null) _buildPreviewCard(),
+          const SizedBox(height: 32),
+          
+          if (_isLoading) 
+            const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
+          else if (_autoTitle != null) 
+            _buildPreviewCard()
+          else
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(40),
+                child: Column(
+                  children: [
+                    Icon(Icons.auto_awesome_motion_rounded, size: 48, color: Colors.grey.withValues(alpha: 0.2)),
+                    const SizedBox(height: 12),
+                    const Text('Pratinjau berita akan muncul di sini setelah link ditempel.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  ],
+                ),
+              ),
+            ),
+            
           const SizedBox(height: 40),
           SizedBox(
-            width: double.infinity, height: 55,
+            width: double.infinity, height: 58,
             child: ElevatedButton(
               onPressed: (_autoTitle != null && !_isLoading) ? () => _publish('berita') : null,
-              style: ElevatedButton.styleFrom(backgroundColor: primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-              child: const Text('TERBITKAN BERITA', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(backgroundColor: primary, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)), elevation: 0),
+              child: const Text('BAGIKAN BERITA', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
             ),
           )
         ],
@@ -327,15 +338,31 @@ class _AddAnnouncementScreenState extends State<AddAnnouncementScreen> with Sing
 
   Widget _buildPreviewCard() {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFE2E8F0))),
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white, 
+        borderRadius: BorderRadius.circular(24), 
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 15, offset: const Offset(0, 8))],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (_autoImage != null) ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.network(_autoImage!, height: 120, width: double.infinity, fit: BoxFit.cover)),
-          const SizedBox(height: 12),
-          Text(_autoTitle ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          Text(_autoDesc ?? '', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          if (_autoImage != null) 
+            ClipRRect(borderRadius: const BorderRadius.vertical(top: Radius.circular(24)), child: Image.network(_autoImage!, height: 180, width: double.infinity, fit: BoxFit.cover)),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('PREVIEW BERITA', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.orange, letterSpacing: 1)),
+                const SizedBox(height: 8),
+                Text(_autoTitle ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E293B))),
+                const SizedBox(height: 8),
+                Text(_autoDesc ?? '', maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.5)),
+              ],
+            ),
+          ),
         ],
       ),
     );

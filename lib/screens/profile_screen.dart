@@ -1,17 +1,16 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:package_info_plus/package_info_plus.dart';
-import 'edit_profile_screen.dart';
+import 'package:image_picker/image_picker.dart';
 import 'settings_screen.dart';
-import 'faq_screen.dart';
 import 'welcome_screen.dart';
-import 'changelog_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
-  final VoidCallback? onBack; 
-  const ProfileScreen({super.key, required this.userData, this.onBack});
+  final VoidCallback? onBack;
+  final VoidCallback? onRefresh; 
+  const ProfileScreen({super.key, required this.userData, this.onBack, this.onRefresh});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -20,35 +19,12 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _isNikVisible = false;
   late Map<String, dynamic> _user;
-  bool _hasUpdate = false;
-  String _currentVersion = "";
+  bool _isUploading = false;
 
   @override
   void initState() {
     super.initState();
     _user = widget.userData;
-    _checkVersion();
-  }
-
-  Future<void> _checkVersion() async {
-    try {
-      final packageInfo = await PackageInfo.fromPlatform();
-      _currentVersion = packageInfo.version;
-      
-      final data = await Supabase.instance.client
-          .from('app_updates')
-          .select('version_name')
-          .order('version_code', ascending: false)
-          .limit(1)
-          .maybeSingle();
-
-      if (data != null && mounted) {
-        final latestVersion = data['version_name'];
-        if (latestVersion != _currentVersion) {
-          setState(() => _hasUpdate = true);
-        }
-      }
-    } catch (e) { /* ignore */ }
   }
 
   @override
@@ -62,21 +38,117 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _refreshData() async {
-    final nik = _user['nik'];
-    final data = await Supabase.instance.client
-        .from('users')
-        .select()
-        .eq('nik', nik)
-        .maybeSingle();
+    try {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) return;
+      
+      final data = await Supabase.instance.client
+          .from('users')
+          .select()
+          .eq('id', userId)
+          .maybeSingle();
+      
+      if (data != null && mounted) {
+        setState(() {
+          _user = data;
+        });
+        
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('cached_user_name', data['nama_lengkap'] ?? 'Warga');
+        await prefs.setString('cached_user_foto', data['foto_profil'] ?? '');
+
+        if (widget.onRefresh != null) widget.onRefresh!();
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  Future<void> _pickAndUploadImage() async {
+    final picker = ImagePicker();
     
-    if (data != null && mounted) {
-      setState(() {
-        _user = data;
-      });
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('GANTI FOTO PROFIL', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 1, color: Colors.grey)),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () => Navigator.pop(context, ImageSource.camera),
+                    child: _buildSourceCard(Icons.camera_alt_rounded, 'Kamera'),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: InkWell(
+                    onTap: () => Navigator.pop(context, ImageSource.gallery),
+                    child: _buildSourceCard(Icons.photo_library_rounded, 'Galeri'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
+    final pickedFile = await picker.pickImage(source: source, imageQuality: 50);
+    if (pickedFile == null) return;
+
+    setState(() => _isUploading = true);
+
+    try {
+      final client = Supabase.instance.client;
+      final user = client.auth.currentUser;
+      if (user == null) return;
+
+      final file = File(pickedFile.path);
+      final fileName = '${user.id}/avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      
+      await client.storage.from('user_avatars').upload(fileName, file);
+      final imageUrl = client.storage.from('user_avatars').getPublicUrl(fileName);
+      await client.from('users').update({'foto_profil': imageUrl}).eq('id', user.id);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Foto profil berhasil diperbarui!'), backgroundColor: Color(0xFF0F766E)));
+        _refreshData();
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal upload: $e'), backgroundColor: Colors.red));
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
     }
   }
 
+  Widget _buildSourceCard(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: const Color(0xFF0F766E), size: 32),
+          const SizedBox(height: 12),
+          Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        ],
+      ),
+    );
+  }
+
   Future<void> _logout() async {
+    await Supabase.instance.client.auth.signOut();
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
     if (mounted) {
@@ -125,27 +197,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(30),
+                borderRadius: BorderRadius.circular(32),
                 boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 15, offset: const Offset(0, 5))],
               ),
               child: Column(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: primaryTeal.withValues(alpha: 0.1), width: 3),
-                    ),
-                    child: CircleAvatar(
-                      radius: 55,
-                      backgroundColor: primaryTeal,
-                      backgroundImage: (_user['foto_profil'] != null && _user['foto_profil'].isNotEmpty)
-                          ? NetworkImage(_user['foto_profil'])
-                          : null,
-                      child: (_user['foto_profil'] == null || _user['foto_profil'].isEmpty)
-                          ? const Icon(Icons.person, size: 55, color: Colors.white)
-                          : null,
-                    ),
+                  Stack(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: primaryTeal.withValues(alpha: 0.1), width: 3),
+                        ),
+                        child: CircleAvatar(
+                          radius: 55,
+                          backgroundColor: primaryTeal.withValues(alpha: 0.05),
+                          backgroundImage: (_user['foto_profil'] != null && _user['foto_profil'].toString().isNotEmpty)
+                              ? NetworkImage(_user['foto_profil'])
+                              : null,
+                          child: (_user['foto_profil'] == null || _user['foto_profil'].toString().isEmpty)
+                              ? const Icon(Icons.person, size: 55, color: primaryTeal)
+                              : null,
+                        ),
+                      ),
+                      if (_isUploading)
+                        const Positioned.fill(
+                          child: Center(child: CircularProgressIndicator(color: primaryTeal)),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   Text(
@@ -153,25 +233,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     textAlign: TextAlign.center,
                     style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textDark),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
                   Text(
                     _user['email'] ?? '-',
-                    style: const TextStyle(color: Colors.grey, fontSize: 14),
+                    style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
                   ),
                   const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                         final Map<String, String> stringUser = _user.map((key, value) => MapEntry(key, value?.toString() ?? ''));
-                         Navigator.push(context, MaterialPageRoute(builder: (c) => EditProfileScreen(userData: stringUser))).then((_) => _refreshData());
-                      },
-                      icon: const Icon(Icons.edit_note_rounded, size: 20),
-                      label: const Text('EDIT PROFIL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1)),
+                      onPressed: _isUploading ? null : _pickAndUploadImage,
+                      icon: const Icon(Icons.add_a_photo_rounded, size: 18),
+                      label: const Text('GANTI FOTO PROFIL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 0.5)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryTeal,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         elevation: 0,
                       ),
@@ -180,105 +257,69 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(30),
+                borderRadius: BorderRadius.circular(32),
                 boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 15, offset: const Offset(0, 5))],
               ),
               child: Column(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(14)),
-                          child: const Icon(Icons.badge_outlined, color: primaryTeal, size: 22),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Nomor NIK', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                              const SizedBox(height: 2),
-                              Text(
-                                _isNikVisible ? (_user['nik'] ?? '-') : _getMaskedNik(_user['nik'] ?? ''),
-                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textDark, letterSpacing: 1),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => setState(() => _isNikVisible = !_isNikVisible),
-                          icon: Icon(
-                            _isNikVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                            color: const Color(0xFFCBD5E1),
-                            size: 20,
-                          ),
-                        ),
-                      ],
+                  _buildInfoRow(Icons.badge_outlined, 'Nomor NIK', 
+                    _isNikVisible ? (_user['nik'] ?? '-') : _getMaskedNik(_user['nik'] ?? ''),
+                    trailing: IconButton(
+                      onPressed: () => setState(() => _isNikVisible = !_isNikVisible),
+                      icon: Icon(
+                        _isNikVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                        color: const Color(0xFFCBD5E1),
+                        size: 20,
+                      ),
                     ),
                   ),
-                  const Divider(height: 1, indent: 20, endIndent: 20, color: Color(0xFFF1F5F9)),
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(14)),
-                          child: const Icon(Icons.location_on_outlined, color: primaryTeal, size: 22),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Alamat Lengkap', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                              const SizedBox(height: 4),
-                              Text(
-                                _user['alamat'] ?? '-',
-                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textDark, height: 1.4),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  const Divider(height: 1, indent: 70, color: Color(0xFFF1F5F9)),
+                  _buildInfoRow(Icons.location_on_outlined, 'Alamat Lengkap', _user['alamat'] ?? '-'),
+                  const Divider(height: 1, indent: 70, color: Color(0xFFF1F5F9)),
+                  _buildInfoRow(Icons.phone_android_rounded, 'Nomor WhatsApp', _user['nomor_hp'] ?? '-'),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             _buildSettingsTile(context, Icons.settings_outlined, 'Pengaturan', () {
                Navigator.push(context, MaterialPageRoute(builder: (c) => SettingsScreen(userName: _user['nama_lengkap'] ?? 'Warga', userNik: _user['nik'] ?? '-')));
-            }),
-            const SizedBox(height: 12),
-            _buildSettingsTile(
-              context, 
-              Icons.system_update_rounded, 
-              'Versi Aplikasi', 
-              () {
-                setState(() => _hasUpdate = false);
-                Navigator.push(context, MaterialPageRoute(builder: (c) => const ChangelogScreen()));
-              },
-              showBadge: _hasUpdate,
-              trailingText: "v$_currentVersion",
-            ),
-            const SizedBox(height: 12),
-            _buildSettingsTile(context, Icons.help_outline_rounded, 'Pusat Bantuan', () {
-               Navigator.push(context, MaterialPageRoute(builder: (c) => FaqScreen(userName: _user['nama_lengkap'] ?? 'Warga', userNik: _user['nik'] ?? '-')));
             }),
             const SizedBox(height: 12),
             _buildSettingsTile(context, Icons.logout_rounded, 'Keluar Akun', () => _showLogoutDialog(), isDestructive: true),
             const SizedBox(height: 120),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value, {Widget? trailing}) {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(14)),
+            child: Icon(icon, color: const Color(0xFF0F766E), size: 22),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8), fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                const SizedBox(height: 4),
+                Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+              ],
+            ),
+          ),
+          if (trailing != null) trailing,
+        ],
       ),
     );
   }
@@ -305,7 +346,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildSettingsTile(BuildContext context, IconData icon, String title, VoidCallback onTap, {bool isDestructive = false, bool showBadge = false, String? trailingText}) {
+  Widget _buildSettingsTile(BuildContext context, IconData icon, String title, VoidCallback onTap, {bool isDestructive = false, String? trailingText}) {
     const Color primaryTeal = Color(0xFF0F766E);
     const Color textDark = Color(0xFF1E293B);
     final Color iconColor = isDestructive ? Colors.red : primaryTeal;
@@ -314,31 +355,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10)],
       ),
       child: ListTile(
         onTap: onTap,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
         leading: Container(
           padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(color: isDestructive ? Colors.red.withValues(alpha: 0.05) : const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(color: isDestructive ? Colors.red.withValues(alpha: 0.05) : const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(14)),
           child: Icon(icon, color: iconColor, size: 22),
         ),
-        title: Row(
-          children: [
-            Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: textColor)),
-            if (showBadge) ...[
-              const SizedBox(width: 8),
-              Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-              ),
-            ]
-          ],
-        ),
+        title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: textColor)),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [

@@ -1,53 +1,64 @@
-# 🏘️ Sadara Warga (v1.0.0 Stable)
+# Sadara Warga 🏘️🛡️💎
 
-**"Ruang Sapa & Kemudahan Bertetangga"**
+**Aplikasi Pintar Pengelolaan Lingkungan RT/RW**
+*Solusi Modern untuk Tetangga yang Lebih Teratur, Aman, dan Sejahtera.*
 
-Sadara Warga (Sistem Administrasi dan Pelaporan Warga) adalah platform digital eksklusif yang dirancang khusus untuk memenuhi kebutuhan warga di **Kp. Sinagar RT 003 RW 006** Desa Cihideung Udik. Aplikasi ini diciptakan untuk mempererat tali silaturahmi serta menciptakan pelayanan wilayah yang lebih praktis, efisien, dan terbuka bagi seluruh elemen masyarakat.
-
----
-
-## ✨ Fitur Unggulan
-
-### 📝 Layanan Surat Digital
-Pengajuan Surat Pengantar RT kini bisa dilakukan dari genggaman. Data otomatis terisi rapi, Admin tinggal memberikan nomor surat, dan warga tinggal datang untuk tanda tangan basah.
-
-### 💰 Transparansi Kas & Iuran
-Pantau pemasukan (Iuran Sampah, Dana Kematian, dll) serta pengeluaran dana wilayah secara real-time. Dilengkapi integrasi Google Sheets untuk rincian laporan yang mendalam.
-
-### 📢 Kabar & Acara Lingkungan
-Informasi kegiatan warga (Musyawarah, Gotong Royong) dan pengumuman penting disebarkan secara instan melalui notifikasi dan banner di Beranda.
-
-### 🏪 Direktori UMKM Hybrid
-Dukung ekonomi tetangga dengan melihat daftar UMKM warga terverifikasi. Aplikasi juga menampilkan pilihan toko/jasa di sekitar wilayah menggunakan data OpenStreetMap (100% Gratis & Akurat).
-
-### 🚩 Pelaporan Masuk (Geotagging)
-Warga bisa melaporkan kendala lingkungan (lampu mati, sampah, dll) dengan otomatis menyertakan titik lokasi GPS yang akurat untuk memudahkan tindak lanjut Admin.
+Sadara Warga bukan sekadar aplikasi pendataan. Ini adalah ruang digital bersama untuk menciptakan lingkungan tinggal yang **Transparan Keuangannya**, **Terjamin Keamanannya**, dan **Maju UMKM-nya**. 
 
 ---
 
-## 🚀 Teknologi yang Digunakan
+## 🌟 Kenapa Lingkungan Kita Butuh Sadara Warga?
 
-- **Frontend**: Flutter (Dart) - Modern, fast, and cross-platform.
-- **Backend**: Supabase - Real-time database & secure storage.
-- **Maps**: OpenStreetMap (OSM) via Overpass API - 100% Open Source.
-- **Integration**: Google Sheets API for financial detailing.
+### 1. 🛡️ Keamanan Akun Lapis Baja
+Kita sangat serius soal data warga. Setiap akun dikunci khusus hanya untuk **satu Handphone saja**. Gak bisa sembarangan dipinjamkan atau disalahgunakan orang luar. Data pribadi Anda terlindungi oleh sistem keamanan modern yang bekerja di balik layar.
+
+### 2. 💰 Dompet RT yang Transparan
+Gak ada lagi rasa curiga soal iuran.
+*   **Ledger Real-time**: Warga bisa pantau saldo kas RT secara langsung dari HP masing-masing.
+*   **Bayar Iuran Dicicil**: Memberatkan kalau bayar langsung besar? Di sini warga bisa mencicil pembayaran iuran sesuai kemampuan hingga lunas.
+*   **Laporan Jelas**: Ringkasan uang masuk dan pengeluaran RT tampil di halaman utama.
+
+### 3. 🛍️ Memajukan Usaha Tetangga (UMKM)
+Punya usaha di rumah? Yuk, tampilkan di Sadara Warga!
+*   **Promosi ke Tetangga**: Usaha Anda akan tampil di halaman depan aplikasi biar semua tetangga tahu.
+*   **Mejeng di Peta Dunia**: Usaha pilihan bahkan bisa kita bantu daftarkan langsung ke peta dunia OpenStreetMap (OSM) secara resmi.
+*   **Tampilan Keren**: Bisa kasih deskripsi produk yang lengkap dan foto yang menggoda selera.
+
+### 4. 📋 Layanan Warga Tanpa Ribet
+*   **Tombol Darurat (SOS)**: Dalam hitungan detik, Anda bisa panggil bantuan petugas atau pengurus jika terjadi sesuatu yang mendesak.
+*   **Surat Digital**: Butuh surat pengantar? Ajukan lewat HP, pantau statusnya, dan ambil jika sudah disetujui. Gak perlu bolak-balik ketuk pintu rumah Pak RT.
+*   **Info & Acara**: Jangan sampai ketinggalan info penting atau jadwal gotong royong. Semua kabar lingkungan ada di satu pintu.
 
 ---
 
-## 🛠️ Instalasi & Pengembangan
+## 🚀 Persiapan Menjalankan Aplikasi
 
-1.  **Clone Repository**
+Jika Anda adalah pengurus wilayah yang ingin mencoba menjalankan sistem ini secara mandiri:
+
+1.  **Ambil Kode Sumber**
     ```bash
-    git clone https://github.com/[USERNAME]/Sadara-Warga.git
+    git clone https://github.com/adhiputra/Sadarawarga.git
+    cd Sadarawarga
     ```
-2.  **Install Dependencies**
+
+2.  **Atur Kunci Rahasia**
+    Siapkan file bernama `.env` di folder utama dan masukkan kode akses Supabase Anda:
+    ```env
+    SUPABASE_URL=https://alamat-proyek-anda.supabase.co
+    SUPABASE_ANON_KEY=kode-anon-anda
+    ```
+
+3.  **Siapkan Aplikasi**
+    Pastikan perangkat Anda sudah terinstall Flutter, lalu jalankan:
     ```bash
     flutter pub get
-    ```
-3.  **Run Application**
-    ```bash
     flutter run
     ```
 
 ---
-© 2026 Sadara Warga - Kp. Sinagar RT 003/006.
+
+## 🤝 Mari Berkolaborasi!
+
+Aplikasi ini dibangun dari niat tulus untuk membuat hidup bertetangga jadi lebih mudah. Jika Anda punya saran fitur baru atau menemukan kendala, jangan ragu untuk berdiskusi dengan kami.
+
+**Sadara Warga** - *Dari Warga, Oleh Warga, Untuk Warga.* 🤝

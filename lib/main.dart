@@ -3,18 +3,22 @@ import 'screens/welcome_screen.dart';
 import 'screens/home_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'widgets/offline_wrapper.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
+    // Muat file .env rahasia
+    await dotenv.load(fileName: ".env");
+    
     await Supabase.initialize(
-      url: 'https://bexwegvrpigxpfpwfjih.supabase.co',
-      anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJleHdlZ3ZycGlneHBmcHdmamloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MDgzNjksImV4cCI6MjA5NjE4NDM2OX0.goGAk1hBVEqQ23szxqmFYYG-BQFHsXYL9T4OzO_zevc',
+      url: dotenv.env['SUPABASE_URL'] ?? '',
+      anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
     );
   } catch (e) {
-    debugPrint('Supabase Init Error: $e');
+    debugPrint('Supabase/Dotenv Init Error: $e');
   }
 
   final prefs = await SharedPreferences.getInstance();

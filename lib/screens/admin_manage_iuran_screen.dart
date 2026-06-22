@@ -1,5 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart';
+
+class CurrencyInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) return newValue;
+    String cleanText = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (cleanText.isEmpty) return newValue.copyWith(text: '');
+    final int value = int.parse(cleanText);
+    final formatter = NumberFormat.decimalPattern('id');
+    String newText = formatter.format(value);
+    return newValue.copyWith(text: newText, selection: TextSelection.collapsed(offset: newText.length));
+  }
+}
 
 class AdminManageIuranScreen extends StatefulWidget {
   const AdminManageIuranScreen({super.key});
@@ -22,9 +37,10 @@ class _AdminManageIuranScreenState extends State<AdminManageIuranScreen> {
 
     setState(() => _isLoading = true);
     try {
+      final int amountValue = int.parse(_amountCtrl.text.replaceAll('.', ''));
       await Supabase.instance.client.from('iuran_kategori').insert({
         'nama_iuran': _nameCtrl.text.trim(),
-        'nominal': double.parse(_amountCtrl.text.replaceAll('.', '')),
+        'nominal': amountValue,
         'deskripsi': _descCtrl.text.trim(),
         'is_active': true,
       });
@@ -47,45 +63,53 @@ class _AdminManageIuranScreenState extends State<AdminManageIuranScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
-      builder: (context) => Padding(
-        padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(child: Container(width: 40, height: 4, decoration: const BoxDecoration(color: Colors.black12, borderRadius: BorderRadius.all(Radius.circular(10))))),
-            const SizedBox(height: 24),
-            const Text('Buat Tagihan Iuran', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
-            _buildField('Nama Iuran', 'Contoh: Iuran Sampah Juli', _nameCtrl),
-            const SizedBox(height: 16),
-            _buildField('Nominal (Rp)', 'Contoh: 25000', _amountCtrl, keyboardType: TextInputType.number),
-            const SizedBox(height: 16),
-            _buildField('Deskripsi (Opsional)', 'Detail iuran...', _descCtrl, maxLines: 2),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity, height: 56,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _createIuran,
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F766E), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('BUAT TAGIHAN SEKARANG', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(child: Container(width: 40, height: 4, decoration: const BoxDecoration(color: Colors.black12, borderRadius: BorderRadius.all(Radius.circular(10))))),
+              const SizedBox(height: 24),
+              const Text('Buat Tagihan Iuran', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              _buildField('Nama Iuran', 'Contoh: Iuran Sampah Juli', _nameCtrl),
+              const SizedBox(height: 16),
+              _buildField('Nominal (Rp)', 'Contoh: 25000', _amountCtrl, keyboardType: TextInputType.number, isCurrency: true),
+              const SizedBox(height: 16),
+              _buildField('Deskripsi (Opsional)', 'Detail iuran...', _descCtrl, maxLines: 2),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity, height: 56,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _createIuran,
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F766E), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                  child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('BUAT TAGIHAN SEKARANG', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildField(String label, String hint, TextEditingController ctrl, {TextInputType? keyboardType, int maxLines = 1}) {
+  Widget _buildField(String label, String hint, TextEditingController ctrl, {TextInputType? keyboardType, int maxLines = 1, bool isCurrency = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B))),
         const SizedBox(height: 8),
         TextField(
-          controller: ctrl, keyboardType: keyboardType, maxLines: maxLines,
+          controller: ctrl, 
+          keyboardType: keyboardType, 
+          maxLines: maxLines,
+          inputFormatters: isCurrency ? [FilteringTextInputFormatter.digitsOnly, CurrencyInputFormatter()] : null,
           decoration: InputDecoration(hintText: hint, filled: true, fillColor: const Color(0xFFF8FAFC), border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.grey.shade200)), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.grey.shade200))),
         ),
       ],
@@ -141,16 +165,24 @@ class _AdminManageIuranScreenState extends State<AdminManageIuranScreen> {
                         return Container(
                           margin: const EdgeInsets.only(bottom: 16),
                           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))]),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.all(16),
-                            title: Text(cat['nama_iuran'], style: const TextStyle(fontWeight: FontWeight.bold, color: textDark)),
-                            subtitle: Text('Rp ${cat['nominal'].toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}', style: const TextStyle(color: primaryTeal, fontWeight: FontWeight.bold)),
-                            trailing: Switch(
-                              value: cat['is_active'] ?? true,
-                              activeColor: primaryTeal,
-                              onChanged: (val) async {
-                                await Supabase.instance.client.from('iuran_kategori').update({'is_active': val}).eq('id', cat['id']);
-                              },
+                          child: StatefulBuilder(
+                            builder: (context, setTileState) => ListTile(
+                              contentPadding: const EdgeInsets.all(16),
+                              title: Text(cat['nama_iuran'], style: const TextStyle(fontWeight: FontWeight.bold, color: textDark), overflow: TextOverflow.ellipsis),
+                              subtitle: Text('Rp ${NumberFormat('#,###', 'id_ID').format(cat['nominal'])}', style: const TextStyle(color: primaryTeal, fontWeight: FontWeight.bold)),
+                              trailing: Switch(
+                                value: cat['is_active'] ?? true,
+                                activeThumbColor: primaryTeal,
+                                activeTrackColor: primaryTeal.withValues(alpha: 0.2),
+                                onChanged: (val) async {
+                                  // Update lokal dulu buat sat-set (instant feedback)
+                                  setTileState(() {
+                                    cat['is_active'] = val;
+                                  });
+                                  // Baru update ke database
+                                  await Supabase.instance.client.from('iuran_kategori').update({'is_active': val}).eq('id', cat['id']);
+                                },
+                              ),
                             ),
                           ),
                         );

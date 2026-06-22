@@ -5,9 +5,9 @@ import 'package:url_launcher/url_launcher.dart';
 class AdminLaporanScreen extends StatelessWidget {
   const AdminLaporanScreen({super.key});
 
-  Future<void> _updateReportStatus(BuildContext context, String id, String newStatus) async {
+  Future<void> _updateReportStatus(BuildContext context, dynamic reportId, String newStatus) async {
     try {
-      await Supabase.instance.client.from('reports').update({'status': newStatus}).eq('id', id);
+      await Supabase.instance.client.from('reports').update({'status': newStatus}).eq('id', reportId);
       if (context.mounted) {
         Navigator.pop(context); // Tutup Detail Modal
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(

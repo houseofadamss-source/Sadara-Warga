@@ -23,9 +23,9 @@ class _AdminVerifikasiScreenState extends State<AdminVerifikasiScreen> with Sing
     super.dispose();
   }
 
-  Future<void> _updateUserStatus(BuildContext context, String nik, String status) async {
+  Future<void> _updateUserStatus(BuildContext context, String userId, String status) async {
     try {
-      await Supabase.instance.client.from('users').update({'status_akun': status}).eq('nik', nik);
+      await Supabase.instance.client.from('users').update({'status_akun': status}).eq('id', userId);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(status == 'approved' ? 'Warga berhasil disetujui!' : 'Pendaftaran ditolak.'),
@@ -35,6 +35,22 @@ class _AdminVerifikasiScreenState extends State<AdminVerifikasiScreen> with Sing
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal: $e')));
+      }
+    }
+  }
+
+  Future<void> _resetDeviceId(BuildContext context, String userId) async {
+    try {
+      await Supabase.instance.client.from('users').update({'device_id': null}).eq('id', userId);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Gembok HP berhasil di-reset! Warga bisa login di HP baru.'),
+          backgroundColor: Colors.blue,
+        ));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal reset: $e')));
       }
     }
   }
@@ -77,7 +93,7 @@ class _AdminVerifikasiScreenState extends State<AdminVerifikasiScreen> with Sing
 
   Widget _buildUserList(String status, Color primaryTeal, Color textDark) {
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: Supabase.instance.client.from('users').stream(primaryKey: ['nik']).eq('status_akun', status).order('nama_lengkap'),
+      stream: Supabase.instance.client.from('users').stream(primaryKey: ['id']).eq('status_akun', status).order('nama_lengkap'),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) return Center(child: CircularProgressIndicator(color: primaryTeal));
         
@@ -170,7 +186,7 @@ class _AdminVerifikasiScreenState extends State<AdminVerifikasiScreen> with Sing
                                     children: [
                                       Expanded(
                                         child: ElevatedButton(
-                                          onPressed: () => _updateUserStatus(context, user['nik'], 'approved'),
+                                          onPressed: () => _updateUserStatus(context, user['id'], 'approved'),
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor: primaryTeal,
                                             foregroundColor: Colors.white,
@@ -183,7 +199,7 @@ class _AdminVerifikasiScreenState extends State<AdminVerifikasiScreen> with Sing
                                       const SizedBox(width: 12),
                                       Expanded(
                                         child: OutlinedButton(
-                                          onPressed: () => _updateUserStatus(context, user['nik'], 'rejected'),
+                                          onPressed: () => _updateUserStatus(context, user['id'], 'rejected'),
                                           style: OutlinedButton.styleFrom(
                                             foregroundColor: Colors.red,
                                             side: const BorderSide(color: Colors.red),
@@ -194,18 +210,37 @@ class _AdminVerifikasiScreenState extends State<AdminVerifikasiScreen> with Sing
                                       ),
                                     ],
                                   )
-                                : SizedBox(
-                                    width: double.infinity,
-                                    child: OutlinedButton.icon(
-                                      onPressed: () => _updateUserStatus(context, user['nik'], 'pending'),
-                                      icon: const Icon(Icons.undo_rounded, size: 18),
-                                      label: const Text('BATALKAN VERIFIKASI'),
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: Colors.orange,
-                                        side: const BorderSide(color: Colors.orange),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                : Column(
+                                    children: [
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: ElevatedButton.icon(
+                                          onPressed: () => _resetDeviceId(context, user['id']),
+                                          icon: const Icon(Icons.phonelink_erase_rounded, size: 18),
+                                          label: const Text('RESET GEMBOK HP'),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.blue.shade50,
+                                            foregroundColor: Colors.blue.shade700,
+                                            elevation: 0,
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                      const SizedBox(height: 8),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: OutlinedButton.icon(
+                                          onPressed: () => _updateUserStatus(context, user['id'], 'pending'),
+                                          icon: const Icon(Icons.undo_rounded, size: 18),
+                                          label: const Text('BATALKAN VERIFIKASI'),
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: Colors.orange,
+                                            side: const BorderSide(color: Colors.orange),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                             ),
                           ],

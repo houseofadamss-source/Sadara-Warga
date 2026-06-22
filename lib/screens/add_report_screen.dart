@@ -5,7 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 
 class AddReportScreen extends StatefulWidget {
-  final String nik;
+  final String nik; // Legacy support
   final String nama;
   const AddReportScreen({super.key, required this.nik, required this.nama});
 
@@ -31,33 +31,15 @@ class _AddReportScreenState extends State<AddReportScreen> {
   }
 
   Future<void> _determinePosition() async {
-    bool serviceEnabled;
-    LocationPermission permission;
-
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return;
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) return;
-    }
-    
-    if (permission == LocationPermission.deniedForever) return;
-
     try {
       final pos = await Geolocator.getCurrentPosition();
       setState(() => _currentPosition = pos);
-    } catch (e) {
-      debugPrint('Error location: $e');
-    }
+    } catch (e) { /* ignore */ }
   }
 
   Future<void> _pickImage() async {
     final XFile? pickedFile = await _picker.pickImage(source: ImageSource.camera, imageQuality: 50);
-    if (pickedFile != null) {
-      setState(() => _imageFile = File(pickedFile.path));
-    }
+    if (pickedFile != null) setState(() => _imageFile = File(pickedFile.path));
   }
 
   Future<void> _submitReport() async {
@@ -70,19 +52,21 @@ class _AddReportScreenState extends State<AddReportScreen> {
 
     try {
       final client = Supabase.instance.client;
+      final user = client.auth.currentUser;
+      if (user == null) throw 'Sesi berakhir, silakan login ulang.';
+
       String? uploadedImageUrl;
 
-      // 1. Upload Foto jika ada
+      // 1. Upload Foto
       if (_imageFile != null) {
-        final fileName = 'report_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        final path = 'reports/$fileName';
-        await client.storage.from('berkas_warga').upload(path, _imageFile!);
-        uploadedImageUrl = client.storage.from('berkas_warga').getPublicUrl(path);
+        final fileName = 'report_${user.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        await client.storage.from('berkas_warga').upload('reports/$fileName', _imageFile!);
+        uploadedImageUrl = client.storage.from('berkas_warga').getPublicUrl('reports/$fileName');
       }
 
-      // 2. Simpan ke Database
+      // 2. Simpan via UUID
       await client.from('reports').insert({
-        'nik_warga': widget.nik,
+        'user_id': user.id,
         'nama_warga': widget.nama,
         'judul_laporan': _judulController.text.trim(),
         'deskripsi': _deskripsiController.text.trim(),
@@ -95,10 +79,10 @@ class _AddReportScreenState extends State<AddReportScreen> {
 
       if (mounted) {
         Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Laporan berhasil dikirim!')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Laporan berhasil dikirim!'), backgroundColor: Color(0xFF0F766E)));
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal kirim: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal: $e')));
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }
@@ -107,12 +91,10 @@ class _AddReportScreenState extends State<AddReportScreen> {
   @override
   Widget build(BuildContext context) {
     const Color primaryTeal = Color(0xFF0F766E);
-    
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white, elevation: 0,
-        centerTitle: true,
+        backgroundColor: Colors.white, elevation: 0, centerTitle: true,
         title: const Text('Buat Laporan', style: TextStyle(color: Color(0xFF1E293B), fontWeight: FontWeight.bold, fontSize: 18)),
         leading: IconButton(icon: const Icon(Icons.close, color: Colors.black), onPressed: () => Navigator.pop(context)),
       ),
@@ -121,24 +103,17 @@ class _AddReportScreenState extends State<AddReportScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Upload Foto Section
             GestureDetector(
               onTap: _pickImage,
               child: Container(
                 width: double.infinity, height: 200,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: const Color(0xFFE2E8F0), style: BorderStyle.solid),
-                ),
+                decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(24), border: Border.all(color: const Color(0xFFE2E8F0))),
                 child: _imageFile != null 
                   ? ClipRRect(borderRadius: BorderRadius.circular(24), child: Image.file(_imageFile!, fit: BoxFit.cover))
                   : const Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.add_a_photo_outlined, size: 40, color: primaryTeal), SizedBox(height: 12), Text('Ambil Foto Kejadian', style: TextStyle(color: primaryTeal, fontWeight: FontWeight.bold))]),
               ),
             ),
             const SizedBox(height: 24),
-            
-            // Pilih Kategori
             const Text('Kategori Laporan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E293B))),
             const SizedBox(height: 12),
             SizedBox(
@@ -152,10 +127,7 @@ class _AddReportScreenState extends State<AddReportScreen> {
                     child: Container(
                       margin: const EdgeInsets.only(right: 10),
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: isSelected ? primaryTeal : const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
+                      decoration: BoxDecoration(color: isSelected ? primaryTeal : const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(20)),
                       child: Center(child: Text(kat, style: TextStyle(color: isSelected ? Colors.white : const Color(0xFF64748B), fontWeight: FontWeight.bold, fontSize: 12))),
                     ),
                   );
@@ -163,24 +135,18 @@ class _AddReportScreenState extends State<AddReportScreen> {
               ),
             ),
             const SizedBox(height: 24),
-
             _buildLabel('Judul Kejadian'),
             _buildTextField('Contoh: Lampu Jalan Mati', _judulController),
             const SizedBox(height: 20),
-            
             _buildLabel('Deskripsi Lengkap'),
             _buildTextField('Ceritakan detail kejadiannya...', _deskripsiController, maxLines: 5),
-            
             const SizedBox(height: 40),
-            
             SizedBox(
               width: double.infinity, height: 58,
               child: ElevatedButton(
                 onPressed: _isUploading ? null : _submitReport,
                 style: ElevatedButton.styleFrom(backgroundColor: primaryTeal, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)), elevation: 0),
-                child: _isUploading 
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('KIRIM LAPORAN SEKARANG', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5, color: Colors.white)),
+                child: _isUploading ? const CircularProgressIndicator(color: Colors.white) : const Text('KIRIM LAPORAN SEKARANG', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
               ),
             ),
           ],
@@ -190,17 +156,10 @@ class _AddReportScreenState extends State<AddReportScreen> {
   }
 
   Widget _buildLabel(String text) => Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(text, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E293B))));
-  
   Widget _buildTextField(String hint, TextEditingController controller, {int maxLines = 1}) {
     return TextField(
       controller: controller, maxLines: maxLines,
-      decoration: InputDecoration(
-        hintText: hint, hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
-        fillColor: const Color(0xFFF8FAFC), filled: true,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.shade200)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.shade200)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF0F766E))),
-      ),
+      decoration: InputDecoration(hintText: hint, hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14), fillColor: const Color(0xFFF8FAFC), filled: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.shade200)), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.shade200)), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF0F766E)))),
     );
   }
 }

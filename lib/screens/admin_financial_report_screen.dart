@@ -6,11 +6,20 @@ import 'package:intl/intl.dart';
 class CurrencyInputFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
-    if (newValue.selection.baseOffset == 0) return newValue;
-    double value = double.parse(newValue.text.replaceAll('.', ''));
+    if (newValue.text.isEmpty) return newValue;
+    
+    // Hapus semua karakter selain angka
+    String cleanText = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (cleanText.isEmpty) return newValue.copyWith(text: '');
+    
+    final int value = int.parse(cleanText);
     final formatter = NumberFormat.decimalPattern('id');
     String newText = formatter.format(value);
-    return newValue.copyWith(text: newText, selection: TextSelection.collapsed(offset: newText.length));
+    
+    return newValue.copyWith(
+      text: newText,
+      selection: TextSelection.collapsed(offset: newText.length),
+    );
   }
 }
 
@@ -23,7 +32,6 @@ class AdminFinancialReportScreen extends StatefulWidget {
 
 class _AdminFinancialReportScreenState extends State<AdminFinancialReportScreen> {
   final _saldoCtrl = TextEditingController();
-  final _docUrlCtrl = TextEditingController();
   final _expTitleCtrl = TextEditingController();
   final _expAmountCtrl = TextEditingController();
   
@@ -37,13 +45,12 @@ class _AdminFinancialReportScreenState extends State<AdminFinancialReportScreen>
   }
 
   Future<void> _fetchCurrentKas() async {
-    final data = await Supabase.instance.client.from('kas_rt').select().maybeSingle();
+    final data = await Supabase.instance.client.from('kas_rt').select().limit(1).maybeSingle();
     if (data != null && mounted) {
       setState(() {
         _currentKas = data;
         final formatter = NumberFormat.decimalPattern('id');
         _saldoCtrl.text = formatter.format(data['total_saldo']);
-        _docUrlCtrl.text = data['google_doc_url'] ?? '';
       });
     }
   }
@@ -51,10 +58,10 @@ class _AdminFinancialReportScreenState extends State<AdminFinancialReportScreen>
   Future<void> _updateKasSettings() async {
     setState(() => _isLoading = true);
     try {
-      final double saldoValue = double.parse(_saldoCtrl.text.replaceAll('.', ''));
+      final int saldoValue = int.parse(_saldoCtrl.text.replaceAll('.', ''));
       final data = {
         'total_saldo': saldoValue,
-        'google_doc_url': _docUrlCtrl.text.trim(),
+        'last_updated': DateTime.now().toIso8601String(),
       };
 
       if (_currentKas == null) {
@@ -64,7 +71,7 @@ class _AdminFinancialReportScreenState extends State<AdminFinancialReportScreen>
       }
 
       await _fetchCurrentKas();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pengaturan Kas diperbarui!'), backgroundColor: Colors.green));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saldo Kas diperbarui!'), backgroundColor: Color(0xFF0F766E)));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal: $e')));
     } finally {
@@ -72,29 +79,27 @@ class _AdminFinancialReportScreenState extends State<AdminFinancialReportScreen>
     }
   }
 
-  Future<void> _publishReport() async {
-    if (_currentKas == null) return;
-    try {
-      await Supabase.instance.client.from('kas_rt').update({'is_published': true}).eq('id', _currentKas!['id']);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Warga telah diberitahu!'), backgroundColor: Colors.blue));
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal: $e')));
-    }
-  }
-
   Future<void> _addExpenditure() async {
     if (_expTitleCtrl.text.isEmpty || _expAmountCtrl.text.isEmpty) return;
     setState(() => _isLoading = true);
     try {
-      final amount = double.parse(_expAmountCtrl.text.replaceAll('.', ''));
-      await Supabase.instance.client.from('pengeluaran_kas').insert({
-        'judul': _expTitleCtrl.text.trim(),
+      final int amount = int.parse(_expAmountCtrl.text.replaceAll('.', ''));
+      final client = Supabase.instance.client;
+
+      // 1. Simpan ke Pengeluaran
+      await client.from('pengeluaran_kas').insert({
+        'judul_pengeluaran': _expTitleCtrl.text.trim(),
         'nominal': amount,
+        'tanggal_pengeluaran': DateTime.now().toIso8601String(),
       });
 
+      // 2. Kurangi Saldo Kas RT
       if (_currentKas != null) {
         final newSaldo = (_currentKas!['total_saldo'] as num) - amount;
-        await Supabase.instance.client.from('kas_rt').update({'total_saldo': newSaldo}).eq('id', _currentKas!['id']);
+        await client.from('kas_rt').update({
+          'total_saldo': newSaldo,
+          'last_updated': DateTime.now().toIso8601String(),
+        }).eq('id', _currentKas!['id']);
       }
 
       _expTitleCtrl.clear();
@@ -102,7 +107,7 @@ class _AdminFinancialReportScreenState extends State<AdminFinancialReportScreen>
       await _fetchCurrentKas();
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal: $e'), backgroundColor: Colors.red));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -131,21 +136,19 @@ class _AdminFinancialReportScreenState extends State<AdminFinancialReportScreen>
                 children: [
                   const Text('TRANSPARANSI KAS', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textDark)),
                   const SizedBox(height: 8),
-                  Text(
-                    'Kelola saldo utama, bagikan laporan detail via Google Sheets, dan catat setiap pengeluaran wilayah secara terbuka.',
-                    style: TextStyle(fontSize: 13, color: const Color(0xFF64748B).withValues(alpha: 0.8), height: 1.5),
+                  const Text(
+                    'Kelola saldo utama dan catat setiap pengeluaran wilayah secara terbuka untuk warga.',
+                    style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.5),
                   ),
                   const SizedBox(height: 32),
                   
-                  // Saldo Minimalist Card
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: primaryTeal.withValues(alpha: 0.1)),
-                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.01), blurRadius: 10, offset: const Offset(0, 4))],
+                      borderRadius: BorderRadius.circular(32),
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 20, offset: const Offset(0, 10))],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -154,54 +157,39 @@ class _AdminFinancialReportScreenState extends State<AdminFinancialReportScreen>
                         const SizedBox(height: 8),
                         Text(
                           'Rp ${_currentKas != null ? NumberFormat.decimalPattern('id').format(_currentKas!['total_saldo']) : '0'}',
-                          style: const TextStyle(color: primaryTeal, fontSize: 28, fontWeight: FontWeight.w900),
+                          style: const TextStyle(color: primaryTeal, fontSize: 32, fontWeight: FontWeight.w900),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 32),
 
-                  _buildSectionHeader('KONFIGURASI'),
-                  _buildTextField('Manual Adjustment Saldo', _saldoCtrl, keyboardType: TextInputType.number, isCurrency: true),
+                  _buildSectionHeader('PENGATURAN SALDO MANUAL'),
+                  _buildTextField('Nominal Saldo (Adjustment)', _saldoCtrl, keyboardType: TextInputType.number, isCurrency: true),
                   const SizedBox(height: 16),
-                  _buildTextField('Link Laporan (G-Sheets)', _docUrlCtrl, hint: 'https://docs.google.com/spreadsheets/...'),
-                  const SizedBox(height: 24),
                   
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : _updateKasSettings,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryTeal, foregroundColor: Colors.white,
-                            elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                            padding: const EdgeInsets.symmetric(vertical: 16)
-                          ),
-                          child: _isLoading ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('SIMPAN PERUBAHAN', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                        ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _updateKasSettings,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryTeal, foregroundColor: Colors.white,
+                        elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        padding: const EdgeInsets.symmetric(vertical: 18)
                       ),
-                      const SizedBox(width: 12),
-                      Container(
-                        decoration: BoxDecoration(color: Colors.amber.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(14)),
-                        child: IconButton(
-                          onPressed: _publishReport,
-                          icon: const Icon(Icons.notifications_active_outlined, color: Colors.orange),
-                          tooltip: 'Beritahu Warga',
-                        ),
-                      ),
-                    ],
+                      child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('UPDATE SALDO UTAMA', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                    ),
                   ),
 
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 48),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildSectionHeader('CATATAN PENGELUARAN'),
+                      _buildSectionHeader('RIWAYAT PENGELUARAN'),
                       TextButton.icon(
                         onPressed: _showExpModal,
                         icon: const Icon(Icons.add_circle_outline, size: 16),
-                        label: const Text('TAMBAH', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        label: const Text('TAMBAH BARU', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                         style: TextButton.styleFrom(foregroundColor: primaryTeal),
                       )
                     ],
@@ -227,14 +215,15 @@ class _AdminFinancialReportScreenState extends State<AdminFinancialReportScreen>
         controller: ctrl, 
         keyboardType: keyboardType,
         inputFormatters: isCurrency ? [FilteringTextInputFormatter.digitsOnly, CurrencyInputFormatter()] : null,
-        decoration: InputDecoration(hintText: hint, hintStyle: const TextStyle(fontSize: 12), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.grey.shade200)), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.grey.shade200))),
+        style: const TextStyle(fontWeight: FontWeight.bold),
+        decoration: InputDecoration(hintText: hint, filled: true, fillColor: const Color(0xFFF1F5F9), border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none), contentPadding: const EdgeInsets.all(16)),
       ),
     ]);
   }
 
   Widget _buildExpList() {
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: Supabase.instance.client.from('pengeluaran_kas').stream(primaryKey: ['id']).order('tanggal', ascending: false).limit(10),
+      stream: Supabase.instance.client.from('pengeluaran_kas').stream(primaryKey: ['id']).order('tanggal_pengeluaran', ascending: false).limit(15),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) return const SliverToBoxAdapter(child: SizedBox());
         
@@ -251,16 +240,17 @@ class _AdminFinancialReportScreenState extends State<AdminFinancialReportScreen>
             delegate: SliverChildBuilderDelegate(
               (c, i) {
                 final e = exps[i];
+                final date = DateFormat('dd MMM yyyy').format(DateTime.parse(e['tanggal_pengeluaran']));
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))]),
                   child: Row(
                     children: [
-                      Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 18)),
+                      Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.outbox_rounded, color: Colors.red, size: 20)),
                       const SizedBox(width: 16),
-                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(e['judul'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)), Text(e['tanggal'], style: const TextStyle(fontSize: 11, color: Colors.grey))])),
-                      Text('-Rp ${NumberFormat.decimalPattern('id').format(e['nominal'])}', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 13)),
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(e['judul_pengeluaran'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)), Text(date, style: const TextStyle(fontSize: 11, color: Colors.grey))])),
+                      Text('-Rp ${NumberFormat.decimalPattern('id').format(e['nominal'])}', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 14)),
                     ],
                   ),
                 );
@@ -274,6 +264,6 @@ class _AdminFinancialReportScreenState extends State<AdminFinancialReportScreen>
   }
 
   void _showExpModal() {
-    showModalBottomSheet(context: context, isScrollControlled: true, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))), builder: (c) => Padding(padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(c).viewInsets.bottom + 24), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('Tambah Pengeluaran', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 20), _buildTextField('Keperluan', _expTitleCtrl), const SizedBox(height: 16), _buildTextField('Nominal (Rp)', _expAmountCtrl, keyboardType: TextInputType.number, isCurrency: true), const SizedBox(height: 24), SizedBox(width: double.infinity, height: 54, child: ElevatedButton(onPressed: _addExpenditure, style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))), child: const Text('KURANGI SALDO KAS')))])));
+    showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (c) => Container(decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(32))), padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(c).viewInsets.bottom + 32), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)))), const SizedBox(height: 24), const Text('Tambah Pengeluaran Kas', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 24), _buildTextField('Keperluan Pengeluaran', _expTitleCtrl, hint: 'Misal: Beli Lampu Jalan'), const SizedBox(height: 20), _buildTextField('Nominal (Rp)', _expAmountCtrl, keyboardType: TextInputType.number, isCurrency: true), const SizedBox(height: 32), SizedBox(width: double.infinity, height: 56, child: ElevatedButton(onPressed: _addExpenditure, style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)), elevation: 0), child: const Text('KONFIRMASI PENGELUARAN', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5))))])));
   }
 }

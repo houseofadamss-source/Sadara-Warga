@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'faq_screen.dart';
 import 'about_screen.dart';
+import 'changelog_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   final String userName;
@@ -13,6 +16,39 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _notifEnabled = false;
+  bool _hasUpdate = false;
+  String _currentVersion = "";
+
+  @override
+  void initState() {
+    super.initState();
+    _checkVersion();
+  }
+
+  Future<void> _checkVersion() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() {
+          _currentVersion = packageInfo.version;
+        });
+      }
+      
+      final data = await Supabase.instance.client
+          .from('app_updates')
+          .select('version_name')
+          .order('version_code', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      if (data != null && mounted) {
+        final latestVersion = data['version_name'];
+        if (latestVersion != _currentVersion) {
+          setState(() => _hasUpdate = true);
+        }
+      }
+    } catch (e) { /* ignore */ }
+  }
 
   void _showComingSoon(String title, String desc) {
     showDialog(
@@ -63,8 +99,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => FaqScreen(userName: widget.userName, userNik: widget.userNik))),
             ),
             _buildSettingTile(
-              icon: Icons.info_outline_rounded, color: Colors.indigo,
-              title: 'Tentang Aplikasi', sub: 'Sadara Warga v1.0.0 (RT 03/06)',
+              icon: Icons.system_update_rounded, color: Colors.indigo,
+              title: 'Versi Aplikasi', sub: 'Sadara Warga v$_currentVersion',
+              showBadge: _hasUpdate,
+              onTap: () {
+                setState(() => _hasUpdate = false);
+                Navigator.push(context, MaterialPageRoute(builder: (c) => const ChangelogScreen()));
+              },
+            ),
+            _buildSettingTile(
+              icon: Icons.info_outline_rounded, color: Colors.blueGrey,
+              title: 'Tentang Aplikasi', sub: 'Informasi pengembang & lisensi.',
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AboutScreen())),
             ),
           ],
@@ -75,7 +120,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildSectionHeader(String title) => Padding(padding: const EdgeInsets.only(left: 4, bottom: 12), child: Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8), letterSpacing: 1)));
 
-  Widget _buildSettingTile({required IconData icon, required Color color, required String title, required String sub, Widget? trailing, VoidCallback? onTap}) {
+  Widget _buildSettingTile({required IconData icon, required Color color, required String title, required String sub, Widget? trailing, VoidCallback? onTap, bool showBadge = false}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
@@ -83,7 +128,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         onTap: onTap,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         leading: Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(14)), child: Icon(icon, color: color, size: 20)),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E293B))),
+        title: Row(
+          children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E293B))),
+            if (showBadge) ...[
+              const SizedBox(width: 8),
+              Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
+            ]
+          ],
+        ),
         subtitle: Text(sub, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
         trailing: trailing ?? const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFFCBD5E1)),
       ),
