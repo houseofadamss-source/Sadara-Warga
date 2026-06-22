@@ -29,34 +29,6 @@ Punya usaha di rumah? Yuk, tampilkan di Sadara Warga!
 *   **Surat Digital**: Butuh surat pengantar? Ajukan lewat HP, pantau statusnya, dan ambil jika sudah disetujui. Gak perlu bolak-balik ketuk pintu rumah Pak RT.
 *   **Info & Acara**: Jangan sampai ketinggalan info penting atau jadwal gotong royong. Semua kabar lingkungan ada di satu pintu.
 
----
-
-## 🚀 Persiapan Menjalankan Aplikasi
-
-Jika Anda adalah pengurus wilayah yang ingin mencoba menjalankan sistem ini secara mandiri:
-
-1.  **Ambil Kode Sumber**
-    ```bash
-    git clone https://github.com/adhiputra/Sadarawarga.git
-    cd Sadarawarga
-    ```
-
-2.  **Atur Kunci Rahasia**
-    Siapkan file bernama `.env` di folder utama dan masukkan kode akses Supabase Anda:
-    ```env
-    SUPABASE_URL=https://alamat-proyek-anda.supabase.co
-    SUPABASE_ANON_KEY=kode-anon-anda
-    ```
-
-3.  **Siapkan Aplikasi**
-    Pastikan perangkat Anda sudah terinstall Flutter, lalu jalankan:
-    ```bash
-    flutter pub get
-    flutter run
-    ```
-
----
-
 ## 🤝 Mari Berkolaborasi!
 
 Aplikasi ini dibangun dari niat tulus untuk membuat hidup bertetangga jadi lebih mudah. Jika Anda punya saran fitur baru atau menemukan kendala, jangan ragu untuk berdiskusi dengan kami.
