@@ -25,16 +25,41 @@ class _AdminVerifikasiScreenState extends State<AdminVerifikasiScreen> with Sing
 
   Future<void> _updateUserStatus(BuildContext context, String userId, String status) async {
     try {
-      await Supabase.instance.client.from('users').update({'status_akun': status}).eq('id', userId);
-      if (context.mounted) {
+      // Gunakan Supabase Client langsung untuk update
+      await Supabase.instance.client.from('users').update({
+        'status_akun': status,
+      }).eq('id', userId);
+      
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(status == 'approved' ? 'Warga berhasil disetujui!' : 'Pendaftaran ditolak.'),
           backgroundColor: status == 'approved' ? const Color(0xFF0F766E) : Colors.red,
         ));
       }
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal: $e'), backgroundColor: Colors.red));
+      }
+    }
+  }
+
+  Future<void> _toggleAdminRole(BuildContext context, String userId, String currentRole) async {
+    try {
+      final newRole = currentRole == 'super_admin' ? 'warga' : 'super_admin';
+      
+      await Supabase.instance.client.from('users').update({
+        'role': newRole,
+      }).eq('id', userId);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(newRole == 'super_admin' ? 'Akses Admin diberikan!' : 'Akses Admin dicabut.'),
+          backgroundColor: newRole == 'super_admin' ? Colors.indigo : Colors.orange,
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal mengubah role: $e'), backgroundColor: Colors.red));
       }
     }
   }
@@ -42,15 +67,15 @@ class _AdminVerifikasiScreenState extends State<AdminVerifikasiScreen> with Sing
   Future<void> _resetDeviceId(BuildContext context, String userId) async {
     try {
       await Supabase.instance.client.from('users').update({'device_id': null}).eq('id', userId);
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Gembok HP berhasil di-reset! Warga bisa login di HP baru.'),
           backgroundColor: Colors.blue,
         ));
       }
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal reset: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal reset: $e'), backgroundColor: Colors.red));
       }
     }
   }
@@ -116,7 +141,7 @@ class _AdminVerifikasiScreenState extends State<AdminVerifikasiScreen> with Sing
                     Text(
                       status == 'pending'
                           ? 'Periksa kesesuaian Nama dan NIK dengan Foto KK yang diunggah warga sebelum menyetujui akses.'
-                          : 'Berikut adalah daftar warga yang telah memiliki akses penuh ke aplikasi Sadara Warga.',
+                          : 'Berikut adalah daftar warga yang telah memiliki akses penuh. Anda juga bisa mengatur peran (Admin) di sini.',
                       style: TextStyle(fontSize: 13, color: const Color(0xFF64748B).withValues(alpha: 0.8), height: 1.5),
                     ),
                   ],
@@ -147,6 +172,8 @@ class _AdminVerifikasiScreenState extends State<AdminVerifikasiScreen> with Sing
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
                       final user = users[index];
+                      final bool isAdmin = user['role'] == 'super_admin';
+
                       return Container(
                         margin: const EdgeInsets.only(bottom: 20),
                         decoration: BoxDecoration(
@@ -167,7 +194,17 @@ class _AdminVerifikasiScreenState extends State<AdminVerifikasiScreen> with Sing
                                     ? Icon(Icons.person, color: primaryTeal)
                                     : null,
                               ),
-                              title: Text(user['nama_lengkap'] ?? '-', style: TextStyle(fontWeight: FontWeight.bold, color: textDark)),
+                              title: Row(
+                                children: [
+                                  Expanded(child: Text(user['nama_lengkap'] ?? '-', style: TextStyle(fontWeight: FontWeight.bold, color: textDark))),
+                                  if (isAdmin)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(color: Colors.indigo.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+                                      child: const Text('ADMIN', style: TextStyle(color: Colors.indigo, fontSize: 8, fontWeight: FontWeight.bold)),
+                                    ),
+                                ],
+                              ),
                               subtitle: Text('NIK: ${user['nik']}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                               trailing: status == 'approved' ? const Icon(Icons.check_circle, color: Colors.green, size: 20) : null,
                             ),
@@ -212,19 +249,36 @@ class _AdminVerifikasiScreenState extends State<AdminVerifikasiScreen> with Sing
                                   )
                                 : Column(
                                     children: [
-                                      SizedBox(
-                                        width: double.infinity,
-                                        child: ElevatedButton.icon(
-                                          onPressed: () => _resetDeviceId(context, user['id']),
-                                          icon: const Icon(Icons.phonelink_erase_rounded, size: 18),
-                                          label: const Text('RESET GEMBOK HP'),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.blue.shade50,
-                                            foregroundColor: Colors.blue.shade700,
-                                            elevation: 0,
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: ElevatedButton.icon(
+                                              onPressed: () => _toggleAdminRole(context, user['id'], user['role'] ?? 'warga'),
+                                              icon: Icon(isAdmin ? Icons.person_remove_rounded : Icons.admin_panel_settings_rounded, size: 18),
+                                              label: Text(isAdmin ? 'CABUT ADMIN' : 'JADIKAN ADMIN', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: isAdmin ? Colors.orange.shade50 : Colors.indigo.shade50,
+                                                foregroundColor: isAdmin ? Colors.orange.shade800 : Colors.indigo.shade800,
+                                                elevation: 0,
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                              ),
+                                            ),
                                           ),
-                                        ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: ElevatedButton.icon(
+                                              onPressed: () => _resetDeviceId(context, user['id']),
+                                              icon: const Icon(Icons.phonelink_erase_rounded, size: 18),
+                                              label: const Text('RESET HP', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: Colors.blue.shade50,
+                                                foregroundColor: Colors.blue.shade700,
+                                                elevation: 0,
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                       const SizedBox(height: 8),
                                       SizedBox(
@@ -232,10 +286,10 @@ class _AdminVerifikasiScreenState extends State<AdminVerifikasiScreen> with Sing
                                         child: OutlinedButton.icon(
                                           onPressed: () => _updateUserStatus(context, user['id'], 'pending'),
                                           icon: const Icon(Icons.undo_rounded, size: 18),
-                                          label: const Text('BATALKAN VERIFIKASI'),
+                                          label: const Text('BATALKAN VERIFIKASI', style: TextStyle(fontSize: 11)),
                                           style: OutlinedButton.styleFrom(
-                                            foregroundColor: Colors.orange,
-                                            side: const BorderSide(color: Colors.orange),
+                                            foregroundColor: Colors.grey,
+                                            side: BorderSide(color: Colors.grey.shade300),
                                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                                           ),
                                         ),
