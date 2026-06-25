@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 class AnnouncementDetailScreen extends StatelessWidget {
   final Map<String, dynamic> data;
@@ -102,14 +103,19 @@ class AnnouncementDetailScreen extends StatelessWidget {
                     child: Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
                   ),
                   
-                  // ISI KONTEN
-                  Text(
-                    data['konten'] ?? '',
-                    style: const TextStyle(
-                      fontSize: 16, 
-                      color: textDark, 
-                      height: 1.8,
-                      letterSpacing: 0.2,
+                  // ISI KONTEN (MODIFIKASI: Pake MarkdownBody)
+                  MarkdownBody(
+                    data: data['konten'] ?? '',
+                    styleSheet: MarkdownStyleSheet(
+                      p: const TextStyle(
+                        fontSize: 16, 
+                        color: textDark, 
+                        height: 1.8,
+                        letterSpacing: 0.2,
+                      ),
+                      strong: const TextStyle(fontWeight: FontWeight.w900, color: textDark),
+                      em: const TextStyle(fontStyle: FontStyle.italic),
+                      listBullet: const TextStyle(color: primaryTeal, fontSize: 16),
                     ),
                   ),
                   
@@ -135,7 +141,7 @@ class AnnouncementDetailScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text('Diverifikasi Oleh', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                            Text('Administrator / RT 01', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
+                            Text('Administrator / RT 03', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
                           ],
                         ),
                       ],

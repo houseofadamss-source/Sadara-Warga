@@ -25,7 +25,6 @@ class _AdminVerifikasiScreenState extends State<AdminVerifikasiScreen> with Sing
 
   Future<void> _updateUserStatus(BuildContext context, String userId, String status) async {
     try {
-      // Gunakan Supabase Client langsung untuk update
       await Supabase.instance.client.from('users').update({
         'status_akun': status,
       }).eq('id', userId);

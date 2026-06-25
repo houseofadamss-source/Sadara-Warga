@@ -34,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _selectedIndex = 0;
   final PageController _bannerController = PageController();
   Timer? _bannerTimer;
+  int _bannerCount = 0;
   
   // --- PERSISTENT DATA VARIABLES ---
   List<Map<String, dynamic>> _upcomingEvents = [];
@@ -48,6 +49,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late Stream<List<Map<String, dynamic>>> _kasStream;
   late Stream<List<Map<String, dynamic>>> _iuranKategoriStream;
   late Stream<List<Map<String, dynamic>>> _pembayaranStream;
+  late Stream<List<Map<String, dynamic>>> _featuredAnnouncementsStream;
 
   String _userName = 'Warga';
   String _userRole = 'warga';
@@ -62,6 +64,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.initState();
     _initStreams(); // Kunci koneksi sejak awal!
     _loadCachedProfile(); 
+    _startBannerTimer(); // Mulai timer banner
     Future.microtask(() => _fetchAllDataInParallel());
   }
 
@@ -73,6 +76,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _kasStream = client.from('kas_rt').stream(primaryKey: ['id']).limit(1);
     _iuranKategoriStream = client.from('iuran_kategori').stream(primaryKey: ['id']).eq('is_active', true);
     _pembayaranStream = client.from('pembayaran_iuran').stream(primaryKey: ['id']);
+    _featuredAnnouncementsStream = client.from('announcements').stream(primaryKey: ['id']).eq('is_featured', true).order('created_at', ascending: false);
   }
 
   @override
@@ -120,22 +124,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           _featuredUmkm = List<Map<String, dynamic>>.from(results[1] as List);
           _latestKas = results[2] as Map<String, dynamic>?;
         });
-        _startBannerTimer();
       }
     } catch (e) { /* ignore */ }
   }
 
   void _startBannerTimer() {
     _bannerTimer?.cancel();
-    if (_upcomingEvents.length > 1) {
-      _bannerTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-        if (_bannerController.hasClients) {
-          int nextItem = _bannerController.page!.toInt() + 1;
-          if (nextItem >= _upcomingEvents.length) nextItem = 0;
-          _bannerController.animateToPage(nextItem, duration: const Duration(milliseconds: 600), curve: Curves.easeInOut);
-        }
-      });
-    }
+    _bannerTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (_bannerController.hasClients && _bannerCount > 1) {
+        int nextItem = (_bannerController.page?.toInt() ?? 0) + 1;
+        if (nextItem >= _bannerCount) nextItem = 0;
+        _bannerController.animateToPage(nextItem, duration: const Duration(milliseconds: 600), curve: Curves.easeInOut);
+      }
+    });
   }
 
   Future<void> _fetchUserData() async {
@@ -242,50 +243,84 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildBannerSection() {
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: _eventsStream,
-      initialData: _upcomingEvents,
-      builder: (context, snapshot) {
-        final events = snapshot.data ?? _upcomingEvents;
-        if (events.isEmpty) {
-          return Container(
-            height: 160, 
-            decoration: BoxDecoration(gradient: const LinearGradient(colors: [primaryTeal, Color(0xFF0D9488)]), borderRadius: BorderRadius.circular(28)), 
-            child: const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.event_available_rounded, color: Colors.white, size: 40), SizedBox(height: 12), Text('Belum ada acara dalam waktu dekat', style: TextStyle(color: Colors.white70, fontSize: 12))]))
-          );
-        }
+      builder: (context, snapshotEvents) {
+        return StreamBuilder<List<Map<String, dynamic>>>(
+          stream: _featuredAnnouncementsStream,
+          builder: (context, snapshotAnnouncements) {
+            final events = snapshotEvents.data ?? [];
+            final announcements = snapshotAnnouncements.data ?? [];
+            
+            // Gabungkan kedua data untuk Banner
+            final List<Map<String, dynamic>> combinedBanner = [
+              ...announcements.map((e) => {...e, 'banner_type': 'announcement'}),
+              ...events.map((e) => {...e, 'banner_type': 'event'}),
+            ];
+            
+            // Update jumlah item untuk timer
+            _bannerCount = combinedBanner.length;
 
-        return SizedBox(
-          height: 180, 
-          child: PageView.builder(
-            controller: _bannerController, 
-            itemCount: events.length, 
-            itemBuilder: (context, index) {
-              final ev = events[index];
-              return GestureDetector(
-                onTap: () => _showEventDetail(ev),
-                child: Container(
-                  margin: const EdgeInsets.only(right: 8),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(28), 
-                    image: ev['image_url'] != null ? DecorationImage(image: NetworkImage(ev['image_url']!), fit: BoxFit.cover) : null,
-                    color: primaryTeal
-                  ), 
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(28), 
-                      gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Colors.black.withValues(alpha: 0.8), Colors.transparent])
-                    ), 
-                    padding: const EdgeInsets.all(24), 
-                    child: Column(mainAxisAlignment: MainAxisAlignment.end, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.amber, borderRadius: BorderRadius.circular(8)), child: const Text('ACARA WARGA', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold))),
-                      const SizedBox(height: 8),
-                      Text(ev['title']!, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)), 
-                      Text('${ev['event_date']} • ${ev['event_time']}', style: const TextStyle(color: Colors.white70, fontSize: 12))
-                    ])
-                  )
-                ),
+            if (combinedBanner.isEmpty) {
+              return Container(
+                height: 160, 
+                decoration: BoxDecoration(gradient: const LinearGradient(colors: [primaryTeal, Color(0xFF0D9488)]), borderRadius: BorderRadius.circular(28)), 
+                child: const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.event_available_rounded, color: Colors.white, size: 40), SizedBox(height: 12), Text('Belum ada kabar atau acara baru', style: TextStyle(color: Colors.white70, fontSize: 12))]))
               );
             }
-          )
+
+            return SizedBox(
+              height: 180, 
+              child: PageView.builder(
+                controller: _bannerController, 
+                itemCount: combinedBanner.length, 
+                itemBuilder: (context, index) {
+                  final item = combinedBanner[index];
+                  final bool isEvent = item['banner_type'] == 'event';
+                  
+                  return GestureDetector(
+                    onTap: () {
+                      if (isEvent) {
+                        _showEventDetail(item);
+                      } else {
+                        Navigator.push(context, MaterialPageRoute(builder: (c) => AnnouncementDetailScreen(data: item)));
+                      }
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(28), 
+                        image: item[isEvent ? 'image_url' : 'file_url'] != null 
+                          ? DecorationImage(image: NetworkImage(item[isEvent ? 'image_url' : 'file_url']), fit: BoxFit.cover) 
+                          : null,
+                        color: isEvent ? primaryTeal : Colors.indigo.shade700
+                      ), 
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(28), 
+                          gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Colors.black.withValues(alpha: 0.8), Colors.transparent])
+                        ), 
+                        padding: const EdgeInsets.all(24), 
+                        child: Column(mainAxisAlignment: MainAxisAlignment.end, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), 
+                            decoration: BoxDecoration(color: isEvent ? Colors.amber : Colors.redAccent, borderRadius: BorderRadius.circular(8)), 
+                            child: Text(isEvent ? 'ACARA WARGA' : 'INFO PENTING', style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.white))
+                          ),
+                          const SizedBox(height: 8),
+                          Text(item[isEvent ? 'title' : 'judul']!, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis), 
+                          Text(
+                            isEvent 
+                              ? '${item['event_date']} • ${item['event_time']}' 
+                              : (item['sub_judul'] ?? 'Klik untuk detail informasi'), 
+                            style: const TextStyle(color: Colors.white70, fontSize: 12)
+                          )
+                        ])
+                      )
+                    ),
+                  );
+                }
+              )
+            );
+          }
         );
       },
     );
