@@ -1,24 +1,30 @@
 import 'package:flutter/material.dart';
-import 'screens/welcome_screen.dart';
-import 'screens/home_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'features/auth/presentation/pages/welcome_page.dart';
+import 'features/home/presentation/pages/home_page.dart';
 import 'widgets/offline_wrapper.dart';
+import 'injection_container.dart' as di;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
-    // Muat file .env rahasia
+    // 1. Muat file .env rahasia
     await dotenv.load(fileName: ".env");
     
+    // 2. Inisialisasi Supabase
     await Supabase.initialize(
       url: dotenv.env['SUPABASE_URL'] ?? '',
       anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
     );
+
+    // 3. Inisialisasi Dependency Injection (Clean Architecture)
+    await di.init();
+    
   } catch (e) {
-    debugPrint('Supabase/Dotenv Init Error: $e');
+    debugPrint('Initialization Error: $e');
   }
 
   final prefs = await SharedPreferences.getInstance();
@@ -42,7 +48,7 @@ class SadaraApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0F766E)),
       ),
       home: OfflineWrapper(
-        child: isLoggedIn ? const HomeScreen() : const WelcomeScreen(),
+        child: isLoggedIn ? const HomePage() : const WelcomePage(),
       ),
     );
   }
