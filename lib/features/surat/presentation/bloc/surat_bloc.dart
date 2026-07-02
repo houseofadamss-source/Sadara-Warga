@@ -22,7 +22,7 @@ class SuratBloc extends Bloc<SuratEvent, SuratState> {
 
   Future<void> _onUpdateSuratStatusRequested(UpdateSuratStatusRequested event, Emitter<SuratState> emit) async {
     emit(SuratLoading());
-    final result = await repository.updateSuratStatus(event.id, event.status, event.nomorSurat);
+    final result = await repository.updateSuratStatus(event.id, event.status, event.nomorSurat, fileUrl: event.fileUrl);
     result.fold(
       (failure) => emit(SuratFailure(failure.message)),
       (_) => emit(const SuratActionSuccess('Status surat berhasil diperbarui')),

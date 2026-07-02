@@ -6,6 +6,7 @@ class SuratModel extends SuratEntity {
     required super.userId,
     required super.nik,
     required super.namaLengkap,
+    required super.jenisSurat,
     required super.ttl,
     required super.jenisKelamin,
     required super.agama,
@@ -15,6 +16,9 @@ class SuratModel extends SuratEntity {
     required super.keperluan,
     required super.status,
     super.nomorSurat,
+    super.fileUrl,
+    super.verificationToken,
+    super.kewarganegaraan,
     required super.createdAt,
   });
 
@@ -24,6 +28,7 @@ class SuratModel extends SuratEntity {
       userId: json['user_id']?.toString() ?? '',
       nik: json['nik']?.toString() ?? '',
       namaLengkap: json['nama_lengkap']?.toString() ?? '',
+      jenisSurat: json['jenis_surat']?.toString() ?? 'Surat Pengantar',
       ttl: json['ttl']?.toString() ?? '',
       jenisKelamin: json['jenis_kelamin']?.toString() ?? '',
       agama: json['agama']?.toString() ?? '',
@@ -33,6 +38,9 @@ class SuratModel extends SuratEntity {
       keperluan: json['keperluan']?.toString() ?? '',
       status: json['status']?.toString() ?? 'pending',
       nomorSurat: json['nomor_surat']?.toString(),
+      fileUrl: json['file_url']?.toString(),
+      verificationToken: json['verification_token']?.toString(),
+      kewarganegaraan: json['kewarganegaraan']?.toString(),
       createdAt: DateTime.parse(json['created_at']),
     );
   }
@@ -42,6 +50,7 @@ class SuratModel extends SuratEntity {
       'user_id': userId,
       'nik': nik,
       'nama_lengkap': namaLengkap,
+      'jenis_surat': jenisSurat,
       'ttl': ttl,
       'jenis_kelamin': jenisKelamin,
       'agama': agama,
@@ -51,6 +60,9 @@ class SuratModel extends SuratEntity {
       'keperluan': keperluan,
       'status': status,
       if (nomorSurat != null) 'nomor_surat': nomorSurat,
+      if (fileUrl != null) 'file_url': fileUrl,
+      if (verificationToken != null) 'verification_token': verificationToken,
+      if (kewarganegaraan != null) 'kewarganegaraan': kewarganegaraan,
     };
   }
 

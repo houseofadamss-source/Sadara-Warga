@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../announcements/presentation/pages/admin_announcement_management_page.dart';
 import '../../../announcements/presentation/pages/add_announcement_page.dart';
+import '../../../surat/presentation/pages/surat_preview_debug_page.dart';
 import '../../../citizen_management/presentation/pages/admin_verifikasi_page.dart';
 import '../../../events/presentation/pages/admin_events_page.dart';
 import '../../../finance/presentation/pages/admin_financial_report_page.dart';
@@ -118,6 +119,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               icon: Icons.history_rounded, color: Colors.teal,
               title: 'Kelola Pengumuman', sub: 'Liat history & hapus postingan',
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AdminAnnouncementManagementPage())),
+            ),
+            _buildActionTile(
+              icon: Icons.picture_as_pdf_rounded, color: Colors.deepOrange,
+              title: 'Cek Design Surat (DEBUG)', sub: 'Lihat pratinjau PDF & QR Code',
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const SuratPreviewDebugPage())),
             ),
             _buildActionTile(
               icon: Icons.event_available_rounded, color: Colors.redAccent,

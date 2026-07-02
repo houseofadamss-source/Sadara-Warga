@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verifikasi Surat - Sadara Warga</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f1f5f9; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+        .card { background: white; padding: 35px; border-radius: 30px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.1); max-width: 450px; width: 100%; display: none; border: 1px solid #e2e8f0; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #059669; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 30px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .info-box { text-align: left; background: #f8fafc; padding: 25px; border-radius: 20px; margin-top: 25px; border: 1px solid #f1f5f9; }
+        .label { font-size: 10px; color: #94a3b8; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+        .value { font-size: 15px; color: #1e293b; font-weight: 600; margin: 4px 0 18px 0; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; line-height: 1.5; }
+        h2 { color: #059669; margin: 0; font-weight: 900; font-size: 24px; }
+    </style>
+</head>
+<body>
+<div id="loading">
+    <div class="loader"></div>
+    <p style="text-align:center; color:#64748b; font-weight: 600;">Memverifikasi Dokumen...</p>
+</div>
+<div id="app" class="card">
+    <div style="font-size: 70px; margin-bottom:10px;">✅</div>
+    <h2>DOKUMEN ASLI</h2>
+    <p style="color: #64748b; font-size: 14px; margin: 5px 0 25px 0;">Sistem Informasi Desa Cihideung Udik</p>
+    <div class="info-box">
+        <div class="label">Nomor Surat</div><div class="value" id="no"></div>
+        <div class="label">Nama Pemilik</div><div class="value" id="nama"></div>
+        <div class="label">Keperluan</div><div class="value" id="keperluan"></div>
+        <div class="label">Status</div><div class="value" style="color:#059669; border:none; margin-bottom:0;">TERVERIFIKASI SISTEM</div>
+    </div>
+</div>
+<div id="error" style="display:none; text-align:center;">
+    <h1 style="color:#ef4444;">⚠️ VERIFIKASI GAGAL</h1>
+    <p>Dokumen tidak ditemukan atau token tidak valid.</p>
+</div>
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    const _supabase = supabase.createClient('https://bexwegvrpigxpfpwfjih.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJleHdlZ3ZycGlneHBmcHdmamloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MDgzNjksImV4cCI6MjA5NjE4NDM2OX0.goGAk1hBVEqQ23szxqmFYYG-BQFHsXYL9T4OzO_zevc');
+    async function verify() {
+        if(!token) { document.getElementById('loading').style.display='none'; document.getElementById('error').style.display='block'; return; }
+        const { data, error } = await _supabase.from('surat_pengantar').select('*').eq('verification_token', token).single();
+        document.getElementById('loading').style.display = 'none';
+        if (data && !error) {
+            document.getElementById('app').style.display = 'block';
+            document.getElementById('no').innerText = data.nomor_surat ?? 'Proses';
+            document.getElementById('nama').innerText = data.nama_lengkap ? (data.nama_lengkap.substring(0,3) + '**********') : '***';
+            document.getElementById('keperluan').innerText = data.keperluan;
+        } else { document.getElementById('error').style.display = 'block'; }
+    }
+    verify();
+</script>
+</body>
+</html>

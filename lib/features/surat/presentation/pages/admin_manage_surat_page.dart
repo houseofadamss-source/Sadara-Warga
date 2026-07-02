@@ -28,7 +28,6 @@ class AdminManageSuratView extends StatefulWidget {
 
 class _AdminManageSuratViewState extends State<AdminManageSuratView> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final _noSuratCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -39,7 +38,6 @@ class _AdminManageSuratViewState extends State<AdminManageSuratView> with Single
   @override
   void dispose() {
     _tabController.dispose();
-    _noSuratCtrl.dispose();
     super.dispose();
   }
 
@@ -55,22 +53,26 @@ class _AdminManageSuratViewState extends State<AdminManageSuratView> with Single
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)))),
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.black.withOpacity(0.1), borderRadius: BorderRadius.circular(10)))),
             const SizedBox(height: 24),
-            const Text('Proses Surat Pengantar', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text('Terbitkan Surat Pengantar', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Text('Pemohon: ${surat.namaLengkap}', style: const TextStyle(color: Colors.grey, fontSize: 13)),
             const SizedBox(height: 24),
-            const Text('INPUT NOMOR SURAT RESMI', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.grey, letterSpacing: 0.5)),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _noSuratCtrl,
-              decoration: InputDecoration(
-                hintText: 'Misal: 001/SP/RT03/VI/2026', 
-                filled: true, fillColor: const Color(0xFFF8FAFC), 
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.shade200)),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.shade200)),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF0F766E))),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(color: const Color(0xFF0F766E).withOpacity(0.05), borderRadius: BorderRadius.circular(16)),
+              child: const Row(
+                children: [
+                  Icon(Icons.auto_fix_high_rounded, color: Color(0xFF0F766E)),
+                  SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      'Sistem Cloud akan otomatis memberikan nomor urut resmi dan men-generate PDF bertanda tangan digital.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF0F766E), fontWeight: FontWeight.bold, height: 1.5),
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 32),
@@ -78,8 +80,12 @@ class _AdminManageSuratViewState extends State<AdminManageSuratView> with Single
               width: double.infinity, height: 56,
               child: ElevatedButton(
                 onPressed: () {
-                  context.read<SuratBloc>().add(UpdateSuratStatusRequested(id: surat.id, status: 'approved', nomorSurat: _noSuratCtrl.text.trim()));
-                  _noSuratCtrl.clear();
+                  context.read<SuratBloc>().add(UpdateSuratStatusRequested(
+                    id: surat.id, 
+                    status: 'approved', 
+                    nomorSurat: null,
+                    fileUrl: null, // Let Edge Function fill this!
+                  ));
                   Navigator.pop(context);
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F766E), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)), elevation: 0),
@@ -144,12 +150,7 @@ class _AdminManageSuratViewState extends State<AdminManageSuratView> with Single
                   children: [
                     Text(status == 'pending' ? 'ANTRIAN PENGAJUAN' : 'ARSIP SURAT KELUAR', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
                     const SizedBox(height: 8),
-                    Text(
-                      status == 'pending' 
-                        ? 'Klik tombol proses untuk memberikan nomor surat resmi pada pengajuan warga.' 
-                        : 'Daftar surat pengantar yang telah disetujui dan diberikan nomor resmi.', 
-                      style: TextStyle(fontSize: 13, color: const Color(0xFF64748B).withValues(alpha: 0.8), height: 1.5)
-                    ),
+                    Text(status == 'pending' ? 'Lakukan approval untuk menerbitkan surat resmi secara otomatis.' : 'Daftar surat pengantar yang telah disetujui.', style: TextStyle(fontSize: 13, color: const Color(0xFF64748B).withOpacity(0.8), height: 1.5)),
                   ],
                 ),
               ),
@@ -157,16 +158,7 @@ class _AdminManageSuratViewState extends State<AdminManageSuratView> with Single
             if (items.isEmpty)
               SliverFillRemaining(
                 hasScrollBody: false,
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(status == 'pending' ? Icons.mail_outline_rounded : Icons.mark_as_unread_rounded, size: 64, color: Colors.grey.shade200),
-                      const SizedBox(height: 16),
-                      Text('Tidak ada data ${status == 'pending' ? 'antrian' : 'arsip'}.', style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w500)),
-                    ],
-                  ),
-                ),
+                child: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(status == 'pending' ? Icons.mail_outline_rounded : Icons.mark_as_unread_rounded, size: 64, color: Colors.grey.shade200), const SizedBox(height: 16), Text('Tidak ada data.', style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w500))])),
               )
             else
               SliverPadding(
@@ -178,11 +170,7 @@ class _AdminManageSuratViewState extends State<AdminManageSuratView> with Single
                       return Container(
                         margin: const EdgeInsets.only(bottom: 20),
                         padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: Colors.white, 
-                          borderRadius: BorderRadius.circular(28), 
-                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 15, offset: const Offset(0, 8))]
-                        ),
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 15, offset: const Offset(0, 8))]),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -190,14 +178,14 @@ class _AdminManageSuratViewState extends State<AdminManageSuratView> with Single
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Expanded(child: Text(s.namaLengkap, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Color(0xFF1E293B)))),
-                                if (status == 'approved') Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)), child: Text(s.nomorSurat ?? '-', style: const TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5))),
+                                if (status == 'approved') Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(8)), child: Text(s.nomorSurat ?? '-', style: const TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5))),
                               ],
                             ),
                             const SizedBox(height: 8),
                             Text('KEPERLUAN: ${s.keperluan}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600, letterSpacing: 0.5)),
                             const Divider(height: 40),
                             if (status == 'pending')
-                              SizedBox(width: double.infinity, height: 50, child: ElevatedButton(onPressed: () => _showProcessModal(context, s), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F766E), foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))), child: const Text('PROSES & BERI NOMOR', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5))))
+                              SizedBox(width: double.infinity, height: 50, child: ElevatedButton(onPressed: () => _showProcessModal(context, s), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F766E), foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))), child: const Text('SETUJUI PENGAJUAN', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5))))
                             else
                               Row(children: [const Icon(Icons.check_circle_rounded, color: Colors.green, size: 20), const SizedBox(width: 8), const Text('Sudah Terbit & Terarsipkan', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 13))]),
                           ],

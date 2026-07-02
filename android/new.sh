@@ -1,0 +1,1 @@
+supabase functions deploy generate-surat --no-verify-jwt

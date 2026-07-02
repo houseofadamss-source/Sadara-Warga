@@ -5,7 +5,7 @@ abstract class SuratRemoteDataSource {
   Stream<List<SuratModel>> watchUserSurat(String userId);
   Stream<List<SuratModel>> watchAllSurat(String status);
   Future<void> submitSurat(SuratModel surat);
-  Future<void> updateSuratStatus(String id, String status, String? nomorSurat);
+  Future<void> updateSuratStatus(String id, String status, String? nomorSurat, {String? fileUrl});
 }
 
 class SuratRemoteDataSourceImpl implements SuratRemoteDataSource {
@@ -39,9 +39,12 @@ class SuratRemoteDataSourceImpl implements SuratRemoteDataSource {
   }
 
   @override
-  Future<void> updateSuratStatus(String id, String status, String? nomorSurat) async {
+  Future<void> updateSuratStatus(String id, String status, String? nomorSurat, {String? fileUrl}) async {
     final Map<String, dynamic> data = {'status': status};
     if (nomorSurat != null) data['nomor_surat'] = nomorSurat;
+    if (fileUrl != null) data['file_url'] = fileUrl;
+    if (status == 'approved') data['approved_at'] = DateTime.now().toIso8601String();
+
     await client.from('surat_pengantar').update(data).eq('id', id);
   }
 }

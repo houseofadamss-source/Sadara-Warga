@@ -5,7 +5,7 @@ abstract class SuratEvent extends Equatable {
   const SuratEvent();
 
   @override
-  List<Object> get props => [];
+  List<Object?> get props => [];
 }
 
 class SubmitSuratRequested extends SuratEvent {
@@ -13,16 +13,22 @@ class SubmitSuratRequested extends SuratEvent {
   const SubmitSuratRequested(this.surat);
 
   @override
-  List<Object> get props => [surat];
+  List<Object?> get props => [surat];
 }
 
 class UpdateSuratStatusRequested extends SuratEvent {
   final String id;
   final String status;
   final String? nomorSurat;
+  final String? fileUrl;
 
-  const UpdateSuratStatusRequested({required this.id, required this.status, this.nomorSurat});
+  const UpdateSuratStatusRequested({
+    required this.id, 
+    required this.status, 
+    this.nomorSurat, 
+    this.fileUrl
+  });
 
   @override
-  List<Object> get props => [id, status, if (nomorSurat != null) nomorSurat!];
+  List<Object?> get props => [id, status, nomorSurat, fileUrl];
 }

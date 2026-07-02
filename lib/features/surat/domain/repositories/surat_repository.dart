@@ -6,5 +6,5 @@ abstract class SuratRepository {
   Stream<List<SuratEntity>> watchUserSurat(String userId);
   Stream<List<SuratEntity>> watchAllSurat(String status);
   Future<Either<Failure, Unit>> submitSurat(SuratEntity surat);
-  Future<Either<Failure, Unit>> updateSuratStatus(String id, String status, String? nomorSurat);
+  Future<Either<Failure, Unit>> updateSuratStatus(String id, String status, String? nomorSurat, {String? fileUrl});
 }

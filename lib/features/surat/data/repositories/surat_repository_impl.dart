@@ -28,6 +28,7 @@ class SuratRepositoryImpl implements SuratRepository {
         userId: entity.userId,
         nik: entity.nik,
         namaLengkap: entity.namaLengkap,
+        jenisSurat: entity.jenisSurat,
         ttl: entity.ttl,
         jenisKelamin: entity.jenisKelamin,
         agama: entity.agama,
@@ -37,6 +38,9 @@ class SuratRepositoryImpl implements SuratRepository {
         keperluan: entity.keperluan,
         status: entity.status,
         nomorSurat: entity.nomorSurat,
+        fileUrl: entity.fileUrl,
+        verificationToken: entity.verificationToken,
+        kewarganegaraan: entity.kewarganegaraan,
         createdAt: entity.createdAt,
       );
       await remoteDataSource.submitSurat(model);
@@ -47,9 +51,9 @@ class SuratRepositoryImpl implements SuratRepository {
   }
 
   @override
-  Future<Either<Failure, Unit>> updateSuratStatus(String id, String status, String? nomorSurat) async {
+  Future<Either<Failure, Unit>> updateSuratStatus(String id, String status, String? nomorSurat, {String? fileUrl}) async {
     try {
-      await remoteDataSource.updateSuratStatus(id, status, nomorSurat);
+      await remoteDataSource.updateSuratStatus(id, status, nomorSurat, fileUrl: fileUrl);
       return const Right(unit);
     } catch (e) {
       return Left(ServerFailure(e.toString()));

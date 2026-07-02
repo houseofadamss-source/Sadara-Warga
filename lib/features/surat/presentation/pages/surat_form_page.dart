@@ -11,13 +11,14 @@ import '../bloc/surat_state.dart';
 class SuratFormPage extends StatelessWidget {
   final String nik;
   final String nama;
-  const SuratFormPage({super.key, required this.nik, required this.nama});
+  final String jenisSurat;
+  const SuratFormPage({super.key, required this.nik, required this.nama, required this.jenisSurat});
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => sl<SuratBloc>(),
-      child: SuratFormView(nik: nik, nama: nama),
+      child: SuratFormView(nik: nik, nama: nama, jenisSurat: jenisSurat),
     );
   }
 }
@@ -25,7 +26,8 @@ class SuratFormPage extends StatelessWidget {
 class SuratFormView extends StatefulWidget {
   final String nik;
   final String nama;
-  const SuratFormView({super.key, required this.nik, required this.nama});
+  final String jenisSurat;
+  const SuratFormView({super.key, required this.nik, required this.nama, required this.jenisSurat});
 
   @override
   State<SuratFormView> createState() => _SuratFormViewState();
@@ -40,10 +42,12 @@ class _SuratFormViewState extends State<SuratFormView> {
   String _selectedGender = 'Laki-laki';
   String _selectedAgama = 'Islam';
   String _selectedStatus = 'Kawin';
+  String _selectedWarganegara = 'Indonesia';
 
   final List<String> _genders = ['Laki-laki', 'Perempuan'];
   final List<String> _agamas = ['Islam', 'Kristen', 'Katolik', 'Hindu', 'Budha', 'Konghucu'];
   final List<String> _statuses = ['Belum Kawin', 'Kawin', 'Cerai Hidup', 'Cerai Mati'];
+  final List<String> _nationalities = ['Indonesia', 'WNA'];
 
   void _onSubmitPressed(BuildContext context) {
     final String ttl = _ttlCtrl.text.trim();
@@ -64,6 +68,7 @@ class _SuratFormViewState extends State<SuratFormView> {
       userId: user.id,
       nik: widget.nik,
       namaLengkap: widget.nama,
+      jenisSurat: widget.jenisSurat,
       ttl: ttl,
       jenisKelamin: _selectedGender,
       agama: _selectedAgama,
@@ -72,6 +77,7 @@ class _SuratFormViewState extends State<SuratFormView> {
       tempatTinggal: alamat,
       keperluan: keperluan,
       status: 'pending',
+      kewarganegaraan: _selectedWarganegara,
       createdAt: DateTime.now(),
     );
 
@@ -96,7 +102,7 @@ class _SuratFormViewState extends State<SuratFormView> {
         backgroundColor: Colors.white,
         appBar: AppBar(
           backgroundColor: Colors.white, elevation: 0, centerTitle: true,
-          title: const Text('FORM SURAT PENGANTAR', style: TextStyle(color: textDark, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 1.5)),
+          title: Text(widget.jenisSurat.toUpperCase(), style: const TextStyle(color: textDark, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 1.5)),
           leading: IconButton(icon: const Icon(Icons.close, color: textDark, size: 20), onPressed: () => Navigator.pop(context)),
         ),
         body: SingleChildScrollView(
@@ -136,6 +142,10 @@ class _SuratFormViewState extends State<SuratFormView> {
 
               _buildLabel('PEKERJAAN'),
               _buildTextField('Misal: Karyawan Swasta', _pekerjaanCtrl),
+              const SizedBox(height: 24),
+
+              _buildLabel('KEWARGANEGARAAN'),
+              _buildDropdown(_nationalities, _selectedWarganegara, (v) => setState(() => _selectedWarganegara = v!)),
               const SizedBox(height: 24),
 
               _buildLabel('ALAMAT TINGGAL (SESUAI DOMISILI)'),

@@ -5,6 +5,7 @@ class SuratEntity extends Equatable {
   final String userId;
   final String nik;
   final String namaLengkap;
+  final String jenisSurat;
   final String ttl;
   final String jenisKelamin;
   final String agama;
@@ -14,6 +15,9 @@ class SuratEntity extends Equatable {
   final String keperluan;
   final String status;
   final String? nomorSurat;
+  final String? fileUrl;
+  final String? verificationToken;
+  final String? kewarganegaraan;
   final DateTime createdAt;
 
   const SuratEntity({
@@ -21,6 +25,7 @@ class SuratEntity extends Equatable {
     required this.userId,
     required this.nik,
     required this.namaLengkap,
+    required this.jenisSurat,
     required this.ttl,
     required this.jenisKelamin,
     required this.agama,
@@ -30,13 +35,16 @@ class SuratEntity extends Equatable {
     required this.keperluan,
     required this.status,
     this.nomorSurat,
+    this.fileUrl,
+    this.verificationToken,
+    this.kewarganegaraan,
     required this.createdAt,
   });
 
   @override
   List<Object?> get props => [
-    id, userId, nik, namaLengkap, ttl, jenisKelamin, agama,
+    id, userId, nik, namaLengkap, jenisSurat, ttl, jenisKelamin, agama,
     statusPerkawinan, pekerjaan, tempatTinggal, keperluan,
-    status, nomorSurat, createdAt,
+    status, nomorSurat, fileUrl, verificationToken, kewarganegaraan, createdAt,
   ];
 }

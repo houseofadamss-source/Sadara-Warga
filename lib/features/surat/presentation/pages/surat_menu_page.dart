@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'surat_form_page.dart';
+import 'surat_history_page.dart';
 
 class SuratMenuPage extends StatelessWidget {
   final String nik;
   final String nama;
   const SuratMenuPage({super.key, required this.nik, required this.nama});
 
+  static const Color primaryTeal = Color(0xFF0F766E);
+  static const Color textDark = Color(0xFF1E293B);
+
   @override
   Widget build(BuildContext context) {
-    const Color primaryTeal = Color(0xFF0F766E);
-    const Color textDark = Color(0xFF1E293B);
-
     final List<Map<String, dynamic>> services = [
       {
         'title': 'Surat Pengantar RT',
@@ -57,24 +58,56 @@ class SuratMenuPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            _buildHistoryBanner(context),
+            const SizedBox(height: 32),
             const Text('Pilih Layanan', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textDark)),
             const SizedBox(height: 8),
             const Text('Silakan pilih jenis surat atau informasi persyaratan dokumen yang Anda butuhkan.', style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.5)),
             const SizedBox(height: 32),
-            ...services.map((s) => _buildServiceCard(context, s, primaryTeal, textDark)),
+            ...services.map((s) => _buildServiceCard(context, s)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildServiceCard(BuildContext context, Map<String, dynamic> s, Color primary, Color dark) {
+  Widget _buildHistoryBanner(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const SuratHistoryPage())),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(colors: [primaryTeal, Color(0xFF0D9488)]),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [BoxShadow(color: primaryTeal.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 8))],
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.history_edu_rounded, color: Colors.white, size: 32),
+            SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Riwayat & Status Surat', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text('Cek progress & download PDF surat Anda', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildServiceCard(BuildContext context, Map<String, dynamic> s) {
     bool isAvailable = s['isAvailable'];
 
     return GestureDetector(
       onTap: () {
         if (isAvailable) {
-          Navigator.push(context, MaterialPageRoute(builder: (c) => SuratFormPage(nik: nik, nama: nama)));
+          Navigator.push(context, MaterialPageRoute(builder: (c) => SuratFormPage(nik: nik, nama: nama, jenisSurat: s['title'])));
         } else {
           _showRequirements(context, s);
         }
@@ -85,13 +118,13 @@ class SuratMenuPage extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(24),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: s['color'].withValues(alpha: 0.1), borderRadius: BorderRadius.circular(16)),
+              decoration: BoxDecoration(color: s['color'].withOpacity(0.1), borderRadius: BorderRadius.circular(16)),
               child: Icon(s['icon'], color: s['color'], size: 28),
             ),
             const SizedBox(width: 20),
@@ -99,13 +132,13 @@ class SuratMenuPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(s['title'], style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: dark)),
+                  Text(s['title'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textDark)),
                   const SizedBox(height: 4),
                   Text(s['desc'], style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                   const SizedBox(height: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(color: isAvailable ? Colors.green.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+                    decoration: BoxDecoration(color: isAvailable ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
                     child: Text(isAvailable ? 'AJUKAN ONLINE' : 'LIHAT SYARAT', style: TextStyle(color: isAvailable ? Colors.green : Colors.orange, fontSize: 8, fontWeight: FontWeight.bold)),
                   ),
                 ],
@@ -129,7 +162,7 @@ class SuratMenuPage extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)))),
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.black.withOpacity(0.1), borderRadius: BorderRadius.circular(10)))),
             const SizedBox(height: 24),
             Row(
               children: [
@@ -148,7 +181,7 @@ class SuratMenuPage extends StatelessWidget {
             const SizedBox(height: 24),
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.orange.withValues(alpha: 0.1))),
+              decoration: BoxDecoration(color: Colors.orange.withOpacity(0.05), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.orange.withOpacity(0.1))),
               child: const Row(
                 children: [
                   Icon(Icons.info_outline, color: Colors.orange, size: 20),
